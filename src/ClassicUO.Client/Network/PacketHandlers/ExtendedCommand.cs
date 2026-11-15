@@ -595,6 +595,24 @@ internal static class ExtendedCommand
                 break;
             }
 
+            // ADVENTURE: efeitos de magia modernos (furacao de cura, corpo em chamas).
+            // Sphere: SENDPACKET 0bf w18 w0AD04 <tipo> d<alvo> <r> <g> <b> <tamanho> w<valor> w<ms>
+            case 0xAD04:
+            {
+                byte fxTipo = p.ReadUInt8();
+                uint fxAlvo = p.ReadUInt32BE();
+                byte fxR = p.ReadUInt8();
+                byte fxG = p.ReadUInt8();
+                byte fxB = p.ReadUInt8();
+                byte fxTam = p.ReadUInt8();
+                ushort fxValor = p.ReadUInt16BE();
+                ushort fxMs = p.ReadUInt16BE();
+
+                AdventureFxGump.Receber(world, fxTipo, fxAlvo, fxR, fxG, fxB, fxTam, fxValor, fxMs);
+
+                break;
+            }
+
             case 0x2A:
                 bool isfemale = p.ReadBool();
                 byte race = p.ReadUInt8();

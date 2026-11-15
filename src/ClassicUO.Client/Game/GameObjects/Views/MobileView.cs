@@ -16,6 +16,9 @@ namespace ClassicUO.Game.GameObjects
 {
     public partial class Mobile
     {
+        // ADVENTURE: corpo em chamas ate este Time.Ticks (pacote 0xBF 0xAD04 tipo 2). 0 = sem fogo
+        public uint AdvFogoAte;
+
         private const int SIT_OFFSET_Y = 4;
         private EquipConvData? _equipConvData;
         private int _characterFrameStartY;
@@ -583,6 +586,53 @@ namespace ClassicUO.Game.GameObjects
                 }
             }
             
+            // ADVENTURE: CORPO EM CHAMAS. Redesenha o proprio corpo do personagem varias vezes
+            // em fogo transparente, cada copia mais alta, tremendo e mais fraca: viram labaredas
+            // no formato do corpo subindo. So visual, dura o tempo que o servidor mandou.
+            if (AdvFogoAte != 0)
+            {
+                if (Time.Ticks >= AdvFogoAte)
+                {
+                    AdvFogoAte = 0;
+                }
+                else
+                {
+                    ushort[] advHuesFogo = { 0x0026, 0x002B, 0x0035, 0x002B, 0x0035, 0x0035 }; // vermelho, laranja, amarelo
+                    double advT = Time.Ticks / 1000.0;
+                    float advSumir = Math.Min(1f, (AdvFogoAte - Time.Ticks) / 400f);       // apaga suave no fim
+
+                    for (int advK = 0; advK < advHuesFogo.Length; advK++)
+                    {
+                        int advTreme = (int)(Math.Sin(advT * 17 + advK * 1.9) * 2);
+                        int advSobe = advK * 5 + (int)(Math.Abs(Math.Sin(advT * 9 + advK)) * 4);
+                        float advAlfa = (0.20f - advK * 0.025f) * advSumir;
+
+                        DrawInternal(
+                            batcher,
+                            this,
+                            null,
+                            drawX + advTreme,
+                            drawY - advSobe,
+                            ShaderHueTranslator.GetHueVector(0, false, advAlfa),
+                            IsFlipped,
+                            animIndex,
+                            false,
+                            graphic,
+                            animGroup,
+                            dir,
+                            isHuman,
+                            false,
+                            false,
+                            isGargoyle,
+                            depth + 2f,
+                            mountOffsetY,
+                            advHuesFogo[advK],
+                            charSitting
+                        );
+                    }
+                }
+            }
+
             // drawY + FrameInfo.Y is the top of the drawn sprite; the simple healthbar and name stack on it.
             uint lookKey = ((uint)graphic << 16) | (mount != null ? mount.Graphic : 0u);
             bool isActionFrame = AnimationFromServer && _animationGroup != 0xFF;
