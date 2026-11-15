@@ -9,7 +9,8 @@
 //     id = numero da magia (linha 1) ou da skill (linha 2) para mostrar o nome.
 //     tempo 0 = linha pronta na hora (magia saiu, skill acabou, etc).
 //  A arrancada tambem liga pelo buff 1005 (pacote 0xDF), como antes.
-//  A posicao fica salva no arquivo adventure_painel.txt da pasta do perfil.
+//  A posicao e o TAMANHO ficam salvos no arquivo adventure_painel.txt da pasta do perfil.
+//  TAMANHO: rode a rodinha do mouse em cima do painel (maior / menor).
 // ==========================================================================
 
 using System;
@@ -18,6 +19,7 @@ using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.Managers;
 using ClassicUO.Game.UI.Controls;
+using ClassicUO.Input;
 using ClassicUO.Renderer;
 using Microsoft.Xna.Framework;
 
@@ -27,7 +29,11 @@ namespace ClassicUO.Game.UI.Gumps
     {
         public const ushort BUFF_ARRANCADA = 1005; // numero do buff da arrancada (CR_ICONE no Sphere)
 
-        private const int LARGURA = 190, ALTURA_LINHA = 22, ESPACO = 3, MARGEM = 4;
+        private const int LARGURA_BASE = 190, ALTURA_BASE = 22, ESPACO_BASE = 3, MARGEM_BASE = 4;
+        private const float ESCALA_MIN = 1.0f, ESCALA_MAX = 2.5f, ESCALA_PADRAO = 1.35f, ESCALA_PASSO = 0.15f;
+
+        private float _escala = ESCALA_PADRAO;
+        private int LARGURA, ALTURA_LINHA, ESPACO, MARGEM, ICONE;
         private const ushort HUE_PRONTO = 0x0386;        // cinza (icone apagado)
         private const ushort HUE_TEXTO_ATIVO = 0x0481;   // branco
         private const ushort HUE_TEXTO_PRONTO = 0x03B2;  // cinza escuro
@@ -63,13 +69,33 @@ namespace ClassicUO.Game.UI.Gumps
         public AdventurePainelGump(World world) : base(world, 0, 0)
         {
             _instancia = this;
-            int altura = MARGEM * 2 + NOMES.Length * (ALTURA_LINHA + ESPACO) - ESPACO;
-            Width = LARGURA;
-            Height = altura;
             CanMove = true;
             CanCloseWithRightClick = false;   // sempre na tela
             AcceptMouseInput = true;
             WantUpdateSize = false;
+
+            CarregarPosicao();   // posicao e tamanho salvos
+            Montar();
+        }
+
+        // Monta (ou remonta) o painel no tamanho atual
+        private void Montar()
+        {
+            // guarda o que estava andando para nao perder ao mudar o tamanho
+            Linha[] antes = (Linha[])_linhas.Clone();
+
+            Clear();
+
+            LARGURA = (int)(LARGURA_BASE * _escala);
+            ALTURA_LINHA = (int)(ALTURA_BASE * _escala);
+            ESPACO = Math.Max(2, (int)(ESPACO_BASE * _escala));
+            MARGEM = (int)(MARGEM_BASE * _escala);
+            ICONE = (int)(20 * _escala);
+
+            int altura = MARGEM * 2 + NOMES.Length * (ALTURA_LINHA + ESPACO) - ESPACO;
+            Width = LARGURA;
+            Height = altura;
+            byte fonte = (byte)(_escala >= 1.6f ? 0 : 1);   // letra maior quando o painel e grande
 
             // Fundo escuro semitransparente (sem borda antiga)
             Add(new AlphaBlendControl(0.7f) { Width = LARGURA, Height = altura, BaseColor = new Color(10, 10, 10) });
@@ -79,22 +105,55 @@ namespace ClassicUO.Game.UI.Gumps
                 int y = MARGEM + i * (ALTURA_LINHA + ESPACO);
                 var l = new Linha();
 
-                Add(new AlphaBlendControl(0.9f) { X = MARGEM, Y = y, Width = 20, Height = ALTURA_LINHA, BaseColor = new Color(30, 30, 30) });
-                l.Icone = new ResizableStaticPic(ICONES[i], 20, ALTURA_LINHA) { X = MARGEM, Y = y, Hue = HUE_PRONTO };
+                Add(new AlphaBlendControl(0.9f) { X = MARGEM, Y = y, Width = ICONE, Height = ALTURA_LINHA, BaseColor = new Color(30, 30, 30) });
+                l.Icone = new ResizableStaticPic(ICONES[i], ICONE, ALTURA_LINHA) { X = MARGEM, Y = y, Hue = HUE_PRONTO };
                 Add(l.Icone);
 
-                int bx = MARGEM + 24;
-                Add(new AlphaBlendControl(0.9f) { X = bx, Y = y + 2, Width = LARGURA - bx - MARGEM, Height = ALTURA_LINHA - 4, BaseColor = new Color(35, 35, 35) });
-                l.Barra = new AlphaBlendControl(0.92f) { X = bx, Y = y + 2, Width = 0, Height = ALTURA_LINHA - 4, BaseColor = CORES[i] };
+                int bx = MARGEM + ICONE + 4;
+                int pad = Math.Max(2, ALTURA_LINHA / 10);
+                Add(new AlphaBlendControl(0.9f) { X = bx, Y = y + pad, Width = LARGURA - bx - MARGEM, Height = ALTURA_LINHA - pad * 2, BaseColor = new Color(35, 35, 35) });
+                l.Barra = new AlphaBlendControl(0.92f) { X = bx, Y = y + pad, Width = 0, Height = ALTURA_LINHA - pad * 2, BaseColor = CORES[i] };
                 Add(l.Barra);
 
-                l.Texto = new Label(NOMES[i], true, HUE_TEXTO_PRONTO, 0, 1) { X = bx + 5, Y = y + 3 };
+                l.Texto = new Label(NOMES[i], true, HUE_TEXTO_PRONTO, 0, fonte) { X = bx + 5, Y = y + (ALTURA_LINHA - (fonte == 0 ? 18 : 14)) / 2 };
                 Add(l.Texto);
+
+                // continua de onde estava
+                Linha v = antes[i];
+
+                if (v != null && v.Ativa)
+                {
+                    l.Ativa = true;
+                    l.Inicio = v.Inicio;
+                    l.Fim = v.Fim;
+                    l.Extra = v.Extra;
+                    l.Icone.Hue = HUE_ICONE[i];
+                    l.Texto.Hue = HUE_TEXTO_ATIVO;
+                }
 
                 _linhas[i] = l;
             }
+        }
 
-            CarregarPosicao();
+        // Rodinha do mouse em cima do painel: muda o tamanho e salva
+        public override void OnMouseWheel(MouseEventType delta)
+        {
+            float antes = _escala;
+
+            if (delta == MouseEventType.WheelScrollUp)
+            {
+                _escala = Math.Min(ESCALA_MAX, _escala + ESCALA_PASSO);
+            }
+            else if (delta == MouseEventType.WheelScrollDown)
+            {
+                _escala = Math.Max(ESCALA_MIN, _escala - ESCALA_PASSO);
+            }
+
+            if (Math.Abs(antes - _escala) > 0.001f)
+            {
+                Montar();
+                Salvar();
+            }
         }
 
         // ---------- chamados de fora ----------
@@ -193,7 +252,7 @@ namespace ClassicUO.Game.UI.Gumps
         {
             base.Update();
 
-            int larguraBarra = LARGURA - (MARGEM + 24) - MARGEM;
+            int larguraBarra = LARGURA - (MARGEM + ICONE + 4) - MARGEM;
 
             for (int i = 0; i < _linhas.Length; i++)
             {
@@ -260,6 +319,12 @@ namespace ClassicUO.Game.UI.Gumps
                         X = px;
                         Y = py;
                     }
+
+                    // 3o numero = tamanho (em centesimos: 135 = 1,35x)
+                    if (p.Length >= 3 && int.TryParse(p[2], out int pe))
+                    {
+                        _escala = Math.Max(ESCALA_MIN, Math.Min(ESCALA_MAX, pe / 100f));
+                    }
                 }
             }
             catch
@@ -268,7 +333,7 @@ namespace ClassicUO.Game.UI.Gumps
             }
         }
 
-        public override void Dispose()
+        private void Salvar()
         {
             try
             {
@@ -276,13 +341,18 @@ namespace ClassicUO.Game.UI.Gumps
 
                 if (arq != null)
                 {
-                    File.WriteAllText(arq, X + " " + Y);
+                    File.WriteAllText(arq, X + " " + Y + " " + (int)Math.Round(_escala * 100));
                 }
             }
             catch
             {
                 // nao conseguiu salvar a posicao: sem problema
             }
+        }
+
+        public override void Dispose()
+        {
+            Salvar();
 
             if (_instancia == this)
             {
