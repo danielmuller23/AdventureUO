@@ -4,8 +4,8 @@
 //  Tipo 1 = FURACAO de luz (curas): nasce pequeno e cresce.
 //  Tipo 2 = CORPO EM CHAMAS (Flamestrike)  -> corpo no MobileView.cs + brasas douradas subindo aqui
 //  Tipo 3 = ANEL DE AREA (Arch Cure / Arch Protection): anel abrindo no chao + brilhos subindo
-//  Tipo 4 = ESCUDO (Protection): runas douradas girando + escudo de hexagonos de energia + corpo azul
-//  Tipo 5 = ESPELHO (Magic Reflection): anel prateado girando + estrela de brilho
+//  Tipo 4 = AURA (Protection): corpo em luz dourada com aura larga pulsando (MobileView) + onda no chao
+//  Tipo 5 = FRAGMENTOS (Magic Reflection): cacos de espelho em circulo largo voam e encaixam no corpo
 //  Tipo 6 = MALDICAO (Curse): corpo escuro (MobileView) + fumaca roxa subindo
 //  Tipo 7 = GELO (Paralyze): so o corpo congelado (MobileView)
 //  Tipo 8 = CHUVA DE METEOROS (Meteor Swarm): bolas de fogo caindo do ceu e explodindo
@@ -43,6 +43,8 @@ namespace ClassicUO.Game.UI.Gumps
         }
 
         private static AdventureFxGump _instancia;
+        private static readonly Point[] _caco = new Point[5];
+        private static readonly float[,] forma = { { 0f, -1f }, { 0.55f, -0.2f }, { 0.35f, 0.8f }, { -0.4f, 0.6f }, { -0.6f, -0.3f } };   // formato do caco de espelho
         private static int _sementes;
         private readonly List<Efeito> _efeitos = new List<Efeito>();
 
@@ -77,7 +79,7 @@ namespace ClassicUO.Game.UI.Gumps
                 if (m != null)
                 {
                     if (tipo == 2) m.AdvFogoAte = Time.Ticks + ms;
-                    else if (tipo == 4) m.AdvEscudoAte = Time.Ticks + ms;
+                    else if (tipo == 4) { m.AdvEscudoAte = Time.Ticks + ms; m.AdvEscudoInicio = Time.Ticks; }
                     else if (tipo == 6) m.AdvMaldicaoAte = Time.Ticks + ms;
                     else m.AdvGeloAte = Time.Ticks + ms;
                 }
@@ -303,145 +305,121 @@ namespace ClassicUO.Game.UI.Gumps
             }
         }
 
-        // ---------------- 4: ESCUDO (Protection) ----------------
-        // 1) 4 runas douradas entram girando e se fecham no peito
-        // 2) FLASH: aparece um escudo de hexagonos de energia (favos) em volta do corpo, que pisca e se desfaz
-        // 3) as runas continuam orbitando devagar ate o fim
+        // ---------------- 4: AURA (Protection): so a onda dourada no chao (a aura no corpo e no MobileView) ----------------
         private static void DesenhaEscudo(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg, float sumir)
         {
-            float escala = 0.9f + 0.2f * e.Tamanho;
             Color ouro = new Color(255, 215, 90);
-            Color azul = Color.Lerp(e.Cor, Color.White, 0.25f);
-            Color clara = Color.Lerp(e.Cor, Color.White, 0.7f);
-            int cx = pe.X;
-            int cy = pe.Y - (int)(40 * escala);   // peito
+            Color branco = new Color(255, 250, 220);
 
-            // ---- runas ----
-            float fecha = Math.Min(1f, t / 0.3f);                        // 0 -> 1 nos primeiros 30%
-            float raioRuna = (80f - 38f * fecha) * escala;
-            float giroRuna = seg * (6f - 4f * fecha);                    // gira rapido entrando, depois devagar
-
-            for (int r = 0; r < 4; r++)
+            // 2 ondas saindo do pe quando a magia pega
+            for (int k = 0; k < 2; k++)
             {
-                double ang = r * Math.PI / 2 + giroRuna;
-                int rx = cx + (int)(Math.Cos(ang) * raioRuna);
-                int ry = cy + (int)(Math.Sin(ang) * raioRuna * 0.45f);
-                int tam = (int)(7 * escala);
+                float f = (seg - k * 0.18f) / 0.7f;
 
-                // runa = losango com um traco no meio
-                Linha(batcher, rx, ry - tam, rx + tam, ry, 2, ouro, sumir);
-                Linha(batcher, rx + tam, ry, rx, ry + tam, 2, ouro, sumir);
-                Linha(batcher, rx, ry + tam, rx - tam, ry, 2, ouro, sumir);
-                Linha(batcher, rx - tam, ry, rx, ry - tam, 2, ouro, sumir);
-                Linha(batcher, rx, ry - tam / 2, rx, ry + tam / 2, 2, Color.White, sumir);
-                Ponto(batcher, rx, ry, 10, ouro, 0.25f * sumir);   // brilho da runa
-
-                // rastro da runa enquanto entra
-                if (fecha < 1f)
+                if (f > 0f && f < 1f)
                 {
-                    for (int k = 1; k <= 4; k++)
-                    {
-                        double a2 = ang - k * 0.18;
-                        Ponto(batcher, cx + (int)(Math.Cos(a2) * raioRuna), cy + (int)(Math.Sin(a2) * raioRuna * 0.45f), 4, ouro, (1f - k / 5f) * 0.6f);
-                    }
+                    float sai = 1f - (1f - f) * (1f - f);
+                    Anel(batcher, pe.X, pe.Y, (int)(20 + sai * 110), 0.4f, 72, 4, k == 0 ? branco : ouro, (1f - f) * 0.9f);
                 }
             }
 
-            // ---- flash quando as runas fecham ----
-            float flash = (t - 0.3f) / 0.12f;
-
-            if (flash > 0f && flash < 1f)
+            // faiscas douradas subindo devagar em volta
+            for (int p = 0; p < 14; p++)
             {
-                Ponto(batcher, cx, cy, (int)(70 * escala * flash), clara, (1f - flash) * 0.6f);
-                Anel(batcher, pe.X, pe.Y, (int)((30 + flash * 70) * escala), 0.4f, 48, 4, azul, 1f - flash);
-            }
-
-            // ---- escudo de hexagonos (favos de energia) ----
-            float hexT = (t - 0.3f) / 0.7f;   // 0 -> 1 do flash ate o fim
-
-            if (hexT > 0f)
-            {
-                int raio = (int)(52 * escala);
-                int h = (int)(11 * escala);                              // tamanho do hexagono
-                float dx = h * 1.5f, dy = h * 1.732f;
-                float brilho = hexT < 0.15f ? 1f : (0.35f + 0.2f * (float)Math.Sin(seg * 7)) * sumir;
-
-                for (int col = -5; col <= 5; col++)
-                {
-                    for (int lin = -5; lin <= 5; lin++)
-                    {
-                        float hx = col * dx;
-                        float hy = lin * dy + (col % 2 != 0 ? dy / 2 : 0);
-                        float d = (float)Math.Sqrt(hx * hx + hy * hy);
-
-                        if (d > raio)
-                        {
-                            continue;
-                        }
-
-                        // os favos de fora brilham mais (borda do escudo) e se desfazem por ultimo
-                        float borda = d / raio;
-                        float some = hexT > 0.7f ? Math.Max(0f, 1f - (hexT - 0.7f) / 0.3f * (1.6f - borda)) : 1f;
-                        float alfa = brilho * (0.25f + 0.75f * borda) * some;
-
-                        if (alfa <= 0.02f)
-                        {
-                            continue;
-                        }
-
-                        int px = cx + (int)hx, py = cy + (int)hy;
-
-                        for (int v = 0; v < 6; v++)
-                        {
-                            double a1 = v * Math.PI / 3, a2 = (v + 1) * Math.PI / 3;
-                            Linha(batcher, px + (int)(Math.Cos(a1) * h * 0.92), py + (int)(Math.Sin(a1) * h * 0.92),
-                                px + (int)(Math.Cos(a2) * h * 0.92), py + (int)(Math.Sin(a2) * h * 0.92), 2, borda > 0.75f ? clara : azul, alfa);
-                        }
-
-                        // particula saindo do favo quando o escudo se desfaz
-                        if (hexT > 0.7f)
-                        {
-                            float sobe = (hexT - 0.7f) / 0.3f;
-                            Ponto(batcher, px, py - (int)(sobe * 30), 3, clara, (1f - sobe) * 0.8f);
-                        }
-                    }
-                }
+                float fase = (Rnd(e.Semente, p) + seg * 0.6f) % 1f;
+                double ang = Rnd(e.Semente, p + 30) * Math.PI * 2;
+                int px = pe.X + (int)(Math.Cos(ang) * 34);
+                int py = pe.Y + (int)(Math.Sin(ang) * 12) - (int)(fase * 100);
+                Ponto(batcher, px, py, 3, p % 2 == 0 ? branco : ouro, (float)Math.Sin(Math.PI * fase) * 0.8f * sumir);
             }
         }
 
-        // ---------------- 5: ESPELHO (Magic Reflection) ----------------
+        // ---------------- 5: FRAGMENTOS (Magic Reflection) ----------------
+        // 1) 12 cacos de espelho aparecem num circulo largo   2) giram e voam em espiral ate o player
+        // 3) flash: encaixam no corpo em 3 alturas            4) ficam pulsando e no fim estilhacam para fora
         private static void DesenhaEspelho(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg, float sumir)
         {
-            float escala = 0.9f + 0.25f * e.Tamanho;
-            Color prata = new Color(220, 230, 255);
-            int cy = pe.Y - (int)(35 * escala);
+            float escala = 0.9f + 0.2f * e.Tamanho;
+            Color corpo = e.Cor;                                   // prata-azulado (vem do servidor)
+            Color borda = new Color(255, 215, 90);                 // borda dourada
+            Color claro = Color.Lerp(e.Cor, Color.White, 0.7f);
+            const int N = 12;
 
-            // dois aneis cruzados girando em volta do corpo
-            for (int a = 0; a < 48; a++)
+            float vem = t < 0.15f ? 0f : Math.Min(1f, (t - 0.15f) / 0.27f);   // 0 longe -> 1 encaixado
+            float suave = vem * vem * (3 - 2 * vem);
+            float estilhaca = t > 0.85f ? (t - 0.85f) / 0.15f : 0f;
+
+            for (int i = 0; i < N; i++)
             {
-                double ang = a / 48.0 * Math.PI * 2 + seg * 4;
-                int r = (int)(40 * escala);
-                int x1 = pe.X + (int)(Math.Cos(ang) * r);
-                Ponto(batcher, x1, cy + (int)(Math.Sin(ang) * r * 0.35) - 12, 3, prata, 0.75f * sumir);
-                Ponto(batcher, x1, cy + (int)(Math.Sin(ang) * r * 0.35) + 12, 2, e.Cor, 0.6f * sumir);
+                float rf = 0.85f + 0.3f * Rnd(e.Semente, i);
+                double angIni = i / (double)N * Math.PI * 2;
+                int anel = i % 3;                                  // pernas, cintura, peito
+
+                // posicao longe (circulo largo, uns 5 tiles)
+                double angLonge = angIni + suave * 2.2;            // gira enquanto vem
+                float raioLonge = 135f * rf * escala * (1f - suave);
+                int xLonge = pe.X + (int)(Math.Cos(angLonge) * raioLonge);
+                int yLonge = pe.Y - 30 + (int)(Math.Sin(angLonge) * raioLonge * 0.5f);
+
+                // posicao encaixada no corpo (gira devagar)
+                double angCorpo = angIni + anel * 0.5 + seg * 1.2;
+                int xCorpo = pe.X + (int)(Math.Cos(angCorpo) * 28 * escala);
+                int yCorpo = pe.Y - 18 - anel * 26 + (int)(Math.Sin(angCorpo) * 10);
+
+                int x = (int)(xLonge + (xCorpo - xLonge) * suave);
+                int y = (int)(yLonge + (yCorpo - yLonge) * suave);
+
+                // estilhaca: sai voando para fora
+                if (estilhaca > 0f)
+                {
+                    x += (int)(Math.Cos(angCorpo) * estilhaca * 70);
+                    y += (int)(Math.Sin(angCorpo) * estilhaca * 30) - (int)(estilhaca * 25);
+                }
+
+                bool frente = vem < 1f || Math.Sin(angCorpo) > 0;
+                float alfa = (t < 0.15f ? t / 0.15f : 1f) * (frente ? 1f : 0.45f) * (1f - estilhaca);
+                int tam = (int)((vem < 1f ? 11f : 9f) * escala);
+
+                // rastro enquanto voa
+                if (vem > 0f && vem < 1f)
+                {
+                    for (int k = 1; k <= 5; k++)
+                    {
+                        double a2 = angLonge - k * 0.13;
+                        float r2 = raioLonge + k * 8;
+                        int tx = (int)(pe.X + Math.Cos(a2) * r2 + (xCorpo - pe.X) * suave * 0.3f);
+                        int ty = (int)(pe.Y - 30 + Math.Sin(a2) * r2 * 0.5f);
+                        Ponto(batcher, tx, ty, 4, claro, (1f - k / 6f) * 0.5f);
+                    }
+                }
+
+                // caco = poligono de 5 pontas (contorno dourado + miolo prata)
+                double giro = i * 1.3 + seg * (vem < 1f ? 6 : 1.5);
+                Point[] v = _caco;
+
+                for (int k = 0; k < 5; k++)
+                {
+                    double ca = Math.Cos(giro), sa = Math.Sin(giro);
+                    v[k] = new Point(x + (int)((forma[k, 0] * ca - forma[k, 1] * sa) * tam), y + (int)((forma[k, 0] * sa + forma[k, 1] * ca) * tam));
+                }
+
+                Ponto(batcher, x, y, tam, corpo, alfa * 0.55f);
+                Ponto(batcher, x, y, tam / 2, claro, alfa * 0.7f);
+
+                for (int k = 0; k < 5; k++)
+                {
+                    Point a1 = v[k], a2 = v[(k + 1) % 5];
+                    Linha(batcher, a1.X, a1.Y, a2.X, a2.Y, 2, borda, alfa);
+                }
             }
 
-            // estilhacos de espelho girando
-            for (int p = 0; p < 8; p++)
-            {
-                double ang = p / 8.0 * Math.PI * 2 - seg * 3;
-                int r = (int)(52 * escala);
-                Ponto(batcher, pe.X + (int)(Math.Cos(ang) * r), cy + (int)(Math.Sin(ang) * r * 0.45), 5, Color.White, 0.9f * sumir);
-            }
+            // flash e onda no chao quando encaixa
+            float flash = (t - 0.42f) / 0.12f;
 
-            // estrela de brilho no comeco
-            if (t < 0.35f)
+            if (flash > 0f && flash < 1f)
             {
-                float f = 1f - t / 0.35f;
-                int tam = (int)(60 * escala * (1f - f * 0.5f));
-                Linha(batcher, pe.X - tam, cy, pe.X + tam, cy, 3, Color.White, f);
-                Linha(batcher, pe.X, cy - tam, pe.X, cy + tam, 3, Color.White, f);
-                Ponto(batcher, pe.X, cy, 12, Color.White, f);
+                Ponto(batcher, pe.X, pe.Y - 45, (int)(90 * escala * flash), claro, (1f - flash) * 0.5f);
+                Anel(batcher, pe.X, pe.Y, (int)((35 + flash * 60) * escala), 0.4f, 56, 3, claro, 1f - flash);
             }
         }
 

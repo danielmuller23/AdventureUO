@@ -21,13 +21,14 @@ namespace ClassicUO.Game.GameObjects
         public uint AdvMaldicaoAte;   // tipo 6 Curse
         public uint AdvGeloAte;       // tipo 7 Paralyze
         public uint AdvEscudoAte;     // tipo 4 Protection
+        public uint AdvEscudoInicio;  // quando o Protection comecou (para a explosao de luz inicial)
         // cores (hues do UO). Fogo de dentro pra fora: vermelho forte -> laranja -> amarelo nas pontas
         private static readonly ushort[] AdvHuesFogo = { 0x0021, 0x0026, 0x002B, 0x002E, 0x0030, 0x0030, 0x0035, 0x0035, 0x0036, 0x0036, 0x0035 };   // mais dourado nas pontas
         private static readonly ushort[] AdvHuesEscuro = { 0x0001 };
         private static readonly ushort[] AdvHuesFumaca = { 0x0013, 0x0014, 0x0015, 0x0014, 0x0015 };
         private static readonly ushort[] AdvHuesGeloPinta = { 0x0482 };            // pinta o corpo de gelo (branco-azulado)
         private static readonly ushort[] AdvHuesGelo = { 0x0481, 0x0482 };       // brilho branco piscando por cima
-        private static readonly ushort[] AdvHuesEscudo = { 0x0058, 0x0059, 0x0058 };   // contorno azul do Protection
+        private static readonly ushort[] AdvHuesEscudo = { 0x0035, 0x0030, 0x0035, 0x0036, 0x0030, 0x0035 };   // aura dourada do Protection
 
         private const int SIT_OFFSET_Y = 4;
         private EquipConvData? _equipConvData;
@@ -679,15 +680,19 @@ namespace ClassicUO.Game.GameObjects
                     }
                 }
 
-                // ---- ESCUDO (Protection): contorno azul de energia em volta do corpo ----
+                // ---- AURA (Protection): copias do corpo em luz dourada, cada uma MAIOR, respirando ----
+                // No comeco a aura "explode" bem larga e depois fica pulsando em volta do corpo.
                 if (AdvEscudoAte != 0)
                 {
                     if (Time.Ticks >= AdvEscudoAte) { AdvEscudoAte = 0; }
                     else
                     {
-                        float sumir = Math.Min(1f, (AdvEscudoAte - Time.Ticks) / 500f);
-                        float pulsa = 0.7f + 0.3f * (float)Math.Sin(advT * 6);
-                        AdvCamadas(AdvHuesEscudo, 0.45f * pulsa, 0.12f, 0.07f, 0, 0, sumir, true, 1);
+                        float sumir = Math.Min(1f, (AdvEscudoAte - Time.Ticks) / 600f);
+                        float desde = (Time.Ticks - AdvEscudoInicio) / 1000f;
+                        float explode = desde < 0.5f ? 1f - desde / 0.5f : 0f;           // 1 -> 0 no primeiro meio segundo
+                        float respira = 0.5f + 0.5f * (float)Math.Sin(advT * 5);          // pulsa
+                        float abre = 0.06f + 0.05f * respira + 0.22f * explode;          // amplitude: quanto cada camada cresce
+                        AdvCamadas(AdvHuesEscudo, 0.42f + 0.25f * explode, 0.06f, abre, 0, 0, sumir, true, 0.6);
                     }
                 }
 
