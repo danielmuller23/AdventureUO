@@ -595,6 +595,22 @@ internal static class ExtendedCommand
                 break;
             }
 
+            // ADVENTURE: fada de QUALQUER player (para os outros verem a fada de cada um).
+            // Sphere: SENDPACKET 0bf w19 w0AD05 d<dono> <nivel> <estado> w<arte> w<cor> d<alvo>
+            case 0xAD05:
+            {
+                uint fadaDono = p.ReadUInt32BE();
+                byte fada5Nivel = p.ReadUInt8();
+                byte fada5Estado = p.ReadUInt8();
+                ushort fada5Arte = p.ReadUInt16BE();
+                ushort fada5Cor = p.ReadUInt16BE();
+                uint fada5Alvo = p.ReadUInt32BE();
+
+                AdventureFadaGump.Receber(world, fadaDono, fada5Nivel, fada5Estado, fada5Arte, fada5Cor, fada5Alvo);
+
+                break;
+            }
+
             // ADVENTURE: efeitos de magia modernos (furacao de cura, corpo em chamas).
             // Sphere: SENDPACKET 0bf w18 w0AD04 <tipo> d<alvo> <r> <g> <b> <tamanho> w<valor> w<ms>
             case 0xAD04:
