@@ -124,8 +124,8 @@ namespace ClassicUO.Game.UI.Gumps
                 float t = (Time.Ticks - e.Inicio) / (float)(e.Fim - e.Inicio);   // 0 -> 1
                 float sumir = t < 0.75f ? 1f : 1f - (t - 0.75f) / 0.25f;         // some no final
                 float cresce = 0.3f + 0.7f * Math.Min(1f, t / 0.45f);           // comeca pequeno e vai crescendo
-                float escala = (0.6f + 0.25f * e.Tamanho) * cresce;              // 1 = pequeno, 4 = gigante
-                int altura = (int)(150 * escala);
+                float escala = (1.0f + 0.4f * e.Tamanho) * cresce;               // 1 = pequeno, 4 = gigante (bem maior que antes)
+                int altura = (int)(170 * escala);
                 float giro = (Time.Ticks - e.Inicio) / 1000f * 7f;
                 Color clara = Color.Lerp(e.Cor, Color.White, 0.55f);
                 Color dourada = new Color(255, 240, 150);

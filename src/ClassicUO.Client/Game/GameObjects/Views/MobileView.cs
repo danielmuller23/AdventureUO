@@ -597,15 +597,19 @@ namespace ClassicUO.Game.GameObjects
                 }
                 else
                 {
-                    ushort[] advHuesFogo = { 0x0026, 0x002B, 0x0035, 0x002B, 0x0035, 0x0035 }; // vermelho, laranja, amarelo
+                    // Copias cada vez MAIORES (escala), mais altas e mais fracas: o fogo cresce para cima
+                    ushort[] advHuesFogo = { 0x0026, 0x002B, 0x0026, 0x002B, 0x0035, 0x002B, 0x0035, 0x0035, 0x0035 }; // vermelho, laranja, amarelo
                     double advT = Time.Ticks / 1000.0;
                     float advSumir = Math.Min(1f, (AdvFogoAte - Time.Ticks) / 400f);       // apaga suave no fim
+                    float advEscalaOriginal = Scale;
+                    Rectangle advFrameOriginal = FrameInfo;                               // nao mexe na area de clique
 
                     for (int advK = 0; advK < advHuesFogo.Length; advK++)
                     {
-                        int advTreme = (int)(Math.Sin(advT * 17 + advK * 1.9) * 2);
-                        int advSobe = advK * 5 + (int)(Math.Abs(Math.Sin(advT * 9 + advK)) * 4);
-                        float advAlfa = (0.20f - advK * 0.025f) * advSumir;
+                        int advTreme = (int)(Math.Sin(advT * 17 + advK * 1.9) * (2 + advK / 3));
+                        int advSobe = advK * 7 + (int)(Math.Abs(Math.Sin(advT * 9 + advK)) * 6);
+                        float advAlfa = (0.17f - advK * 0.014f) * advSumir;
+                        Scale = advEscalaOriginal * (1.1f + advK * 0.13f + (float)Math.Sin(advT * 11 + advK) * 0.04f);
 
                         DrawInternal(
                             batcher,
@@ -630,6 +634,9 @@ namespace ClassicUO.Game.GameObjects
                             charSitting
                         );
                     }
+
+                    Scale = advEscalaOriginal;
+                    FrameInfo = advFrameOriginal;
                 }
             }
 
