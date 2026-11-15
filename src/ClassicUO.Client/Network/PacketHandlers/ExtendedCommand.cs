@@ -544,6 +544,23 @@ internal static class ExtendedCommand
 
                 break;
 
+            // ADVENTURE: velocidade do player em % (pacote proprio do shard Adventure).
+            // Sphere: SENDPACKET 0bf w06 w0AD01 <percentual>   (100 = normal, 130 = +30%)
+            // Limites de seguranca: 50% a 250%. Fora disso volta para 100.
+            case 0xAD01:
+            {
+                int pct = p.ReadUInt8();
+
+                if (pct < 50 || pct > 250)
+                {
+                    pct = 100;
+                }
+
+                MovementSpeed.AdventurePercent = pct;
+
+                break;
+            }
+
             case 0x2A:
                 bool isfemale = p.ReadBool();
                 byte race = p.ReadUInt8();

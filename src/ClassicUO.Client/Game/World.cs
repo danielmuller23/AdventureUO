@@ -405,6 +405,7 @@ namespace ClassicUO.Game
             }
 
             Player = new PlayerMobile(this, serial);
+            MovementSpeed.AdventurePercent = 100; // ADVENTURE: todo login comeca na velocidade normal
             Mobiles.Add(Player);
             EventSink.InvokeOnPlayerCreated();
             Log.Trace($"Player [0x{serial:X8}] created");

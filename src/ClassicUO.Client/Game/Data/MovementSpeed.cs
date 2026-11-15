@@ -33,6 +33,23 @@ namespace ClassicUO.Game.Data
             return run ? STEP_DELAY_RUN : STEP_DELAY_WALK;
         }
 
+        // ADVENTURE: velocidade do proprio player em % (100 = normal). O servidor muda com o
+        // pacote 0xBF subcomando 0xAD01 (ver ExtendedCommand.cs). Ex.: 130 = 30% mais rapido.
+        public static int AdventurePercent = 100;
+
+        // ADVENTURE: tempo de 1 passo do proprio player, ja aplicando o AdventurePercent.
+        public static int AdventureTime(bool run, bool mounted)
+        {
+            int t = TimeToCompleteMovement(run, mounted);
+
+            if (AdventurePercent == 100 || AdventurePercent <= 0)
+            {
+                return t;
+            }
+
+            return Math.Max(t * 100 / AdventurePercent, STEP_DELAY_MIN);
+        }
+
         public static void GetPixelOffset(byte dir, ref float x, ref float y, float framesPerTile)
         {
             float step_NESW_D = 44.0f / framesPerTile;

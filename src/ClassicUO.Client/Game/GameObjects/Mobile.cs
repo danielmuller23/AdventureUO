@@ -891,7 +891,12 @@ namespace ClassicUO.Game.GameObjects
                     {
                         int nominal = MovementSpeed.TimeToCompleteMovement(run, actuallyMounted);
 
-                        if (Serial == World.Player || StepInterval <= 0)
+                        if (Serial == World.Player)
+                        {
+                            // ADVENTURE: o proprio player anima na velocidade do servidor (AdventurePercent)
+                            step.Duration = MovementSpeed.AdventureTime(run, actuallyMounted);
+                        }
+                        else if (StepInterval <= 0)
                         {
                             step.Duration = nominal;
                         }
