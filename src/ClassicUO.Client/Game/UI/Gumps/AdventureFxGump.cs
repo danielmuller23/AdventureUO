@@ -2,14 +2,14 @@
 // ==========================================================================
 // ADVENTURE: EFEITOS DE MAGIA modernos (desenhados pelo proprio cliente).
 //  Tipo 1 = FURACAO de luz (curas): nasce pequeno e cresce.
-//  Tipo 2 = CORPO EM CHAMAS (Flamestrike)  -> desenhado no MobileView.cs
+//  Tipo 2 = CORPO EM CHAMAS (Flamestrike)  -> corpo no MobileView.cs + brasas douradas subindo aqui
 //  Tipo 3 = ANEL DE AREA (Arch Cure / Arch Protection): anel abrindo no chao + brilhos subindo
 //  Tipo 4 = BOLHA (Protection): cupula azul em volta do corpo que pulsa e some
 //  Tipo 5 = ESPELHO (Magic Reflection): anel prateado girando + estrela de brilho
 //  Tipo 6 = MALDICAO (Curse): corpo escuro (MobileView) + fumaca roxa subindo
-//  Tipo 7 = GELO (Paralyze): corpo congelado (MobileView) + cristais de gelo no chao
+//  Tipo 7 = GELO (Paralyze): so o corpo congelado (MobileView)
 //  Tipo 8 = CHUVA DE METEOROS (Meteor Swarm): bolas de fogo caindo do ceu e explodindo
-//  Tipo 9 = TERREMOTO (Earthquake): ondas de choque no chao + pedras pulando
+//  Tipo 9 = TERREMOTO (Earthquake): ondas pulsando no chao onde foi solto + tela tremendo
 //
 // Pacote proprio 0xBF sub 0xAD04 (18 bytes):
 //   [tipo byte][alvo dword][R byte][G byte][B byte][tamanho byte][valor word][duracao word ms]
@@ -81,9 +81,9 @@ namespace ClassicUO.Game.UI.Gumps
                     else m.AdvGeloAte = Time.Ticks + ms;
                 }
 
-                if (tipo == 2)
+                if (tipo == 7)
                 {
-                    return;   // fogo nao tem parte extra
+                    return;   // gelo: so no corpo
                 }
             }
 
@@ -125,6 +125,11 @@ namespace ClassicUO.Game.UI.Gumps
 
                 int dx = e.PX - pl.X;
                 int dy = e.PY - pl.Y;
+
+                if (Math.Abs(dx) > 40 || Math.Abs(dy) > 40)
+                {
+                    return false;   // ponto longe demais (ou coordenada errada): nao desenha
+                }
                 wx = pl.RealScreenPosition.X + (dx - dy) * 22 + 22;
                 wy = pl.RealScreenPosition.Y + (dx + dy) * 22 - (e.PZ - pl.Z) * 4 + 18;
             }
@@ -220,11 +225,11 @@ namespace ClassicUO.Game.UI.Gumps
                 switch (e.Tipo)
                 {
                     case 1: DesenhaFuracao(batcher, e, pe, t, sumir); break;
+                    case 2: DesenhaBrasas(batcher, e, pe, t, seg, sumir); break;
                     case 3: DesenhaAnelArea(batcher, e, pe, t, seg, sumir); break;
                     case 4: DesenhaBolha(batcher, e, pe, t, seg, sumir); break;
                     case 5: DesenhaEspelho(batcher, e, pe, t, seg, sumir); break;
                     case 6: DesenhaFumaca(batcher, e, pe, t, seg, sumir); break;
-                    case 7: DesenhaCristais(batcher, e, pe, t, seg); break;
                     case 8: DesenhaMeteoros(batcher, e, pe, t, seg); break;
                     case 9: DesenhaTerremoto(batcher, e, pe, t, seg, sumir); break;
                 }
@@ -387,75 +392,68 @@ namespace ClassicUO.Game.UI.Gumps
             Anel(batcher, pe.X, pe.Y, 34, 0.35f, 40, 3, roxo, 0.6f * sumir, -seg * 2);
         }
 
-        // ---------------- 7: CRISTAIS DE GELO (Paralyze) ----------------
-        private static void DesenhaCristais(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg)
+        // ---------------- 2: BRASAS DOURADAS (Flamestrike) ----------------
+        private static void DesenhaBrasas(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg, float sumir)
         {
-            float nasce = Math.Min(1f, (Time.Ticks - e.Inicio) / 300f);    // brotam rapido
-            float some = Math.Min(1f, (e.Fim - Time.Ticks) / 400f);       // derretem no fim
-            Color gelo = new Color(150, 225, 255);
-            Color branco = new Color(230, 250, 255);
+            Color ouro = new Color(255, 200, 60);
+            Color laranja = new Color(255, 120, 20);
 
-            for (int c = 0; c < 9; c++)
+            // brilho quente no chao
+            Anel(batcher, pe.X, pe.Y, 30 + (int)(Math.Sin(seg * 10) * 3), 0.4f, 40, 5, laranja, 0.55f * sumir);
+            Anel(batcher, pe.X, pe.Y, 20, 0.4f, 32, 4, ouro, 0.6f * sumir);
+
+            // brasas subindo em volta do corpo, abrindo para os lados
+            for (int p = 0; p < 36; p++)
             {
-                double ang = c / 9.0 * Math.PI * 2 + Rnd(e.Semente, c) * 0.5;
-                int r = 22 + (int)(Rnd(e.Semente, c + 10) * 14);
-                int bx = pe.X + (int)(Math.Cos(ang) * r);
-                int by = pe.Y + (int)(Math.Sin(ang) * r * 0.4);
-                int alt = (int)((14 + Rnd(e.Semente, c + 20) * 22) * nasce);
-                int topoX = bx + (int)((Rnd(e.Semente, c + 30) - 0.5f) * 8);
-
-                // cristal = triangulo pontudo (linhas da base ate a ponta)
-                for (int l = -3; l <= 3; l++)
-                {
-                    Linha(batcher, bx + l * 2, by, topoX, by - alt, 2, l == 0 ? branco : gelo, 0.55f * some);
-                }
+                float fase = (Rnd(e.Semente, p) + seg * 1.4f) % 1f;
+                float lado = (Rnd(e.Semente, p + 60) - 0.5f) * 2f;   // -1 esquerda, +1 direita
+                int px = pe.X + (int)(lado * (14 + fase * 34) + Math.Sin(seg * 8 + p) * 4);
+                int py = pe.Y - 6 - (int)(fase * 120);
+                Ponto(batcher, px, py, fase < 0.5f ? 4 : 3, p % 3 == 0 ? Color.White : (p % 3 == 1 ? ouro : laranja), (float)Math.Sin(Math.PI * fase) * sumir);
             }
-
-            // brilhinho piscando no gelo
-            float pisca = (float)Math.Abs(Math.Sin(seg * 5));
-            Ponto(batcher, pe.X - 10, pe.Y - 50, 5, Color.White, pisca * some);
-            Ponto(batcher, pe.X + 12, pe.Y - 30, 4, Color.White, (1 - pisca) * some);
-            Anel(batcher, pe.X, pe.Y, 40, 0.38f, 48, 3, gelo, 0.5f * some);
         }
 
         // ---------------- 8: CHUVA DE METEOROS (Meteor Swarm) ----------------
         private static void DesenhaMeteoros(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg)
         {
             float total = (e.Fim - e.Inicio) / 1000f;
-            int qtd = 4 + e.Tamanho * 2;
+            int qtd = 5 + e.Tamanho * 2;
             Color laranja = new Color(255, 130, 20);
             Color amarelo = new Color(255, 230, 90);
             Color vermelho = new Color(255, 50, 10);
 
             for (int m = 0; m < qtd; m++)
             {
-                float comeca = Rnd(e.Semente, m) * total * 0.5f;    // cada meteoro sai numa hora
-                float queda = 0.45f;                                // tempo caindo (s)
+                float comeca = Rnd(e.Semente, m) * total * 0.55f;   // cada meteoro sai numa hora
+                float queda = 0.5f;                                 // tempo caindo (s)
                 float f = (seg - comeca) / queda;
-
-                double ang = Rnd(e.Semente, m + 40) * Math.PI * 2;
-                float dist = Rnd(e.Semente, m + 80) * 70;
-                int ix = pe.X + (int)(Math.Cos(ang) * dist);       // onde cai
-                int iy = pe.Y + (int)(Math.Sin(ang) * dist * 0.4f);
 
                 if (f < 0f)
                 {
                     continue;
                 }
 
+                // onde cai: espalhado em volta do ponto (uns 3 tiles)
+                double ang = Rnd(e.Semente, m + 40) * Math.PI * 2;
+                float dist = (float)Math.Sqrt(Rnd(e.Semente, m + 80)) * 110;
+                int ix = pe.X + (int)(Math.Cos(ang) * dist);
+                int iy = pe.Y + (int)(Math.Sin(ang) * dist * 0.45f);
+                int desvio = (int)((Rnd(e.Semente, m + 120) - 0.5f) * 120);   // vem levemente de lado, cada um de um jeito
+
                 if (f < 1f)
                 {
-                    // caindo na diagonal com rastro
-                    int cx = ix - (int)((1 - f) * 160);
-                    int cy = iy - (int)((1 - f) * 320);
+                    // caindo quase reto do ceu, com rastro de fogo
+                    float q = f * f;   // acelera
+                    int cx = ix + (int)((1 - q) * desvio);
+                    int cy = iy - (int)((1 - q) * 380);
 
-                    for (int r = 0; r < 10; r++)
+                    for (int r = 0; r < 12; r++)
                     {
-                        Ponto(batcher, cx - r * 6, cy - r * 12, 10 - r, r < 3 ? amarelo : laranja, (1f - r / 10f) * 0.8f);
+                        Ponto(batcher, cx + (int)(r * desvio / 38f), cy - r * 10, 12 - r, r < 3 ? amarelo : (r < 7 ? laranja : vermelho), (1f - r / 12f) * 0.8f);
                     }
 
-                    Ponto(batcher, cx, cy, 12, amarelo, 1f);
-                    Ponto(batcher, cx, cy, 6, Color.White, 1f);
+                    Ponto(batcher, cx, cy, 14, amarelo, 1f);
+                    Ponto(batcher, cx, cy, 7, Color.White, 1f);
                 }
                 else
                 {
@@ -464,72 +462,93 @@ namespace ClassicUO.Game.UI.Gumps
 
                     if (ex < 1f)
                     {
-                        Anel(batcher, ix, iy, (int)(10 + ex * 45), 0.4f, 36, 4, ex < 0.4f ? amarelo : laranja, 1f - ex);
+                        Anel(batcher, ix, iy, (int)(10 + ex * 50), 0.42f, 40, 5, ex < 0.4f ? amarelo : laranja, 1f - ex);
 
-                        for (int s = 0; s < 10; s++)
+                        for (int s = 0; s < 12; s++)
                         {
-                            double a2 = s / 10.0 * Math.PI * 2;
-                            int d = (int)(ex * 35);
-                            Ponto(batcher, ix + (int)(Math.Cos(a2) * d), iy - (int)(Math.Abs(Math.Sin(a2)) * d * 1.2f), 5, vermelho, 1f - ex);
+                            double a2 = s / 12.0 * Math.PI * 2;
+                            int d = (int)(ex * 40);
+                            Ponto(batcher, ix + (int)(Math.Cos(a2) * d), iy - (int)(Math.Abs(Math.Sin(a2)) * d * 1.3f), 5, vermelho, 1f - ex);
                         }
 
-                        Ponto(batcher, ix, iy - 8, (int)(30 * (1 - ex)), amarelo, 0.7f * (1 - ex));
+                        Ponto(batcher, ix, iy - 10, (int)(36 * (1 - ex)), amarelo, 0.7f * (1 - ex));
                     }
                 }
             }
         }
 
-        // ---------------- 9: TERREMOTO (Earthquake) ----------------
+        // ---------------- 9: TERREMOTO (Earthquake): ondas pulsando ----------------
         private static void DesenhaTerremoto(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg, float sumir)
         {
-            Color poeira = new Color(170, 130, 80);
-            Color pedra = new Color(120, 95, 70);
-            Color brilho = new Color(255, 170, 60);
+            Color laranja = new Color(255, 140, 40);
+            Color ouro = new Color(255, 210, 110);
+            Color terra = new Color(150, 100, 50);
             float escala = 0.8f + 0.3f * e.Tamanho;
+            const float PULSO = 0.55f;   // uma onda a cada 0,55 s
 
-            // ondas de choque saindo do caster (uma a cada 0.5s)
-            for (int k = 0; k < 4; k++)
+            int ondas = (int)(seg / PULSO) + 1;
+
+            for (int k = Math.Max(0, ondas - 4); k < ondas; k++)
             {
-                float f = (seg - k * 0.5f) / 1.2f;
+                float f = (seg - k * PULSO) / 1.3f;   // cada onda vive 1,3 s
 
                 if (f < 0f || f > 1f)
                 {
                     continue;
                 }
 
-                Anel(batcher, pe.X, pe.Y, (int)((30 + f * 200) * escala), 0.4f, 90, 4, poeira, (1f - f) * 0.8f * sumir);
-                Anel(batcher, pe.X, pe.Y, (int)((26 + f * 196) * escala), 0.4f, 90, 2, brilho, (1f - f) * 0.4f * sumir);
-            }
+                float sai = 1f - (1f - f) * (1f - f);            // abre rapido e freia (estilo moderno)
+                int raio = (int)((40 + sai * 230) * escala);
+                float alfa = (1f - f) * sumir;
 
-            // rachaduras saindo do centro
-            for (int c = 0; c < 7; c++)
-            {
-                double ang = c / 7.0 * Math.PI * 2 + Rnd(e.Semente, c);
-                float cresce = Math.Min(1f, t / 0.3f);
-                int px = pe.X, py = pe.Y;
+                // a onda e uma faixa: borda brilhante + rastro escurecendo para dentro
+                Anel(batcher, pe.X, pe.Y, raio, 0.42f, 120, 5, ouro, alfa);
+                Anel(batcher, pe.X, pe.Y, raio - 8, 0.42f, 110, 4, laranja, alfa * 0.7f);
+                Anel(batcher, pe.X, pe.Y, raio - 18, 0.42f, 100, 4, terra, alfa * 0.45f);
 
-                for (int s = 1; s <= 5; s++)
+                // poeira e pedrinhas levantando na frente da onda
+                for (int p = 0; p < 26; p++)
                 {
-                    double a2 = ang + (Rnd(e.Semente, c * 10 + s) - 0.5f) * 0.7;
-                    int len = (int)(26 * escala * cresce);
-                    int nx = px + (int)(Math.Cos(a2) * len);
-                    int ny = py + (int)(Math.Sin(a2) * len * 0.4f);
-                    Linha(batcher, px, py, nx, ny, 3, brilho, 0.7f * sumir);
-                    px = nx;
-                    py = ny;
+                    double ang = p / 26.0 * Math.PI * 2 + Rnd(e.Semente, p + k * 31) * 0.3;
+                    int sobe = (int)(Math.Sin(Math.PI * Math.Min(1f, f * 2f)) * (6 + Rnd(e.Semente, p + 77) * 14));
+                    int px = pe.X + (int)(Math.Cos(ang) * raio);
+                    int py = pe.Y + (int)(Math.Sin(ang) * raio * 0.42f) - sobe;
+                    Ponto(batcher, px, py, 4, p % 2 == 0 ? terra : ouro, alfa * 0.8f);
                 }
             }
+        }
 
-            // pedrinhas pulando
-            for (int p = 0; p < 24; p++)
+        // ---------------- TELA TREMENDO (chamado pelo GameScene a cada quadro) ----------------
+        public static void Tremor(ref int x, ref int y)
+        {
+            if (_instancia == null || _instancia.IsDisposed || _instancia._efeitos.Count == 0)
             {
-                float fase = (Rnd(e.Semente, p + 300) + seg * 1.3f) % 1f;
-                double ang = Rnd(e.Semente, p + 400) * Math.PI * 2;
-                float dist = (30 + Rnd(e.Semente, p + 500) * 150) * escala;
-                int px = pe.X + (int)(Math.Cos(ang) * dist);
-                int py = pe.Y + (int)(Math.Sin(ang) * dist * 0.4f) - (int)(Math.Sin(Math.PI * fase) * 30);
-                Ponto(batcher, px, py, 4, p % 2 == 0 ? pedra : poeira, 0.9f * sumir);
+                return;
             }
+
+            float forca = 0f;
+
+            foreach (Efeito e in _instancia._efeitos)
+            {
+                if (e.Tipo != 9 || Time.Ticks >= e.Fim)
+                {
+                    continue;
+                }
+
+                float t = (Time.Ticks - e.Inicio) / (float)(e.Fim - e.Inicio);
+                float seg = (Time.Ticks - e.Inicio) / 1000f;
+                float pulso = (float)Math.Pow(Math.Abs(Math.Sin(seg * Math.PI / 0.55)), 3);   // treme mais forte a cada onda
+                forca = Math.Max(forca, (1f - t) * (2f + 4f * pulso));
+            }
+
+            if (forca <= 0.5f)
+            {
+                return;
+            }
+
+            double tt = Time.Ticks / 1000.0;
+            x += (int)(Math.Sin(tt * 61) * forca);
+            y += (int)(Math.Cos(tt * 47) * forca * 0.7f);
         }
     }
 }

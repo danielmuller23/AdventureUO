@@ -1481,6 +1481,9 @@ namespace ClassicUO.Game.Scenes
             int winDrawOffsetX = (tileOffX - tileOffY) * 22 - winGameCenterX;
             int winDrawOffsetY = (tileOffX + tileOffY) * 22 - winGameCenterY;
 
+            // ADVENTURE: tela tremendo no Earthquake (pacote 0xBF 0xAD04 tipo 9). 0 quando nao tem terremoto
+            ClassicUO.Game.UI.Gumps.AdventureFxGump.Tremor(ref winDrawOffsetX, ref winDrawOffsetY);
+
             int winGameScaledOffsetX;
             int winGameScaledOffsetY;
             int winGameScaledWidth;

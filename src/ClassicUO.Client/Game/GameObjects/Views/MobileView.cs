@@ -21,7 +21,7 @@ namespace ClassicUO.Game.GameObjects
         public uint AdvMaldicaoAte;   // tipo 6 Curse
         public uint AdvGeloAte;       // tipo 7 Paralyze
         // cores (hues do UO). Fogo de dentro pra fora: vermelho forte -> laranja -> amarelo nas pontas
-        private static readonly ushort[] AdvHuesFogo = { 0x0021, 0x0021, 0x0026, 0x002B, 0x002B, 0x002E, 0x0030, 0x0035, 0x0035, 0x0036 };
+        private static readonly ushort[] AdvHuesFogo = { 0x0021, 0x0026, 0x002B, 0x002E, 0x0030, 0x0030, 0x0035, 0x0035, 0x0036, 0x0036, 0x0035 };   // mais dourado nas pontas
         private static readonly ushort[] AdvHuesEscuro = { 0x0001 };
         private static readonly ushort[] AdvHuesFumaca = { 0x0013, 0x0014, 0x0015, 0x0014, 0x0015 };
         private static readonly ushort[] AdvHuesGelo = { 0x0480, 0x0059, 0x0480 };
@@ -605,7 +605,7 @@ namespace ClassicUO.Game.GameObjects
                 Rectangle advFrameOriginal = FrameInfo;   // nao mexe na area de clique
                 double advT = Time.Ticks / 1000.0;
 
-                void AdvCamadas(ushort[] hues, float alfaIni, float alfaPasso, float escPasso, int sobePasso, int treme, float sumir, bool aditivo, double velocidade)
+                void AdvCamadas(ushort[] hues, float alfaIni, float alfaPasso, float escPasso, int sobePasso, int treme, float sumir, bool aditivo, double velocidade, int lados = 0)
                 {
                     if (aditivo)
                     {
@@ -622,6 +622,20 @@ namespace ClassicUO.Game.GameObjects
                         DrawInternal(batcher, this, null, drawX + dx, drawY - sobe, ShaderHueTranslator.GetHueVector(0, false, alfa),
                             IsFlipped, animIndex, false, graphic, animGroup, dir, isHuman, false, false, isGargoyle,
                             depth + 2f + k * 0.01f, mountOffsetY, hues[k], charSitting);
+
+                        // labaredas para os LADOS (da volume): copias deslocadas para a esquerda e direita
+                        if (lados > 0 && k >= 2)
+                        {
+                            int abre = lados + k * 3 + (int)(Math.Sin(advT * 13 * velocidade + k * 2.3) * 3);
+                            Vector3 hLado = ShaderHueTranslator.GetHueVector(0, false, alfa * 0.65f);
+
+                            DrawInternal(batcher, this, null, drawX + dx - abre, drawY - sobe + k, hLado,
+                                IsFlipped, animIndex, false, graphic, animGroup, dir, isHuman, false, false, isGargoyle,
+                                depth + 2f + k * 0.01f, mountOffsetY, hues[k], charSitting);
+                            DrawInternal(batcher, this, null, drawX + dx + abre, drawY - sobe + k, hLado,
+                                IsFlipped, animIndex, false, graphic, animGroup, dir, isHuman, false, false, isGargoyle,
+                                depth + 2f + k * 0.01f, mountOffsetY, hues[k], charSitting);
+                        }
                     }
 
                     if (aditivo)
@@ -664,7 +678,7 @@ namespace ClassicUO.Game.GameObjects
                     {
                         float sumir = Math.Min(1f, (AdvFogoAte - Time.Ticks) / 400f);
                         // de dentro pra fora: vermelho forte -> laranja -> amarelo nas pontas
-                        AdvCamadas(AdvHuesFogo, 0.60f, 0.05f, 0.13f, 7, 2, sumir, true, 1);
+                        AdvCamadas(AdvHuesFogo, 0.60f, 0.045f, 0.14f, 8, 3, sumir, true, 1, 6);   // 6 = abre para os lados
                     }
                 }
 
