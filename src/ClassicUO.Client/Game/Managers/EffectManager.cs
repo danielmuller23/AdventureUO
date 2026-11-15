@@ -55,6 +55,21 @@ namespace ClassicUO.Game.Managers
             GraphicEffectBlendMode blendmode
         )
         {
+            // ADVENTURE: a coluna de fogo antiga do Flamestrike (0x3709) vem do proprio Sphere
+            // (nao sai pelo sphere_spells). Em vez de mostrar a coluna, acende o CORPO EM CHAMAS novo
+            // no char atingido por 2 s. Vale para tudo que manda 0x3709 num char (ex.: armas de fogo).
+            if (graphic == 0x3709 && (type == GraphicEffectType.FixedFrom || type == GraphicEffectType.Moving))
+            {
+                uint advAlvo = type == GraphicEffectType.Moving ? target : source;
+
+                if (SerialHelper.IsMobile(advAlvo) && _world.Mobiles.Get(advAlvo) != null)
+                {
+                    ClassicUO.Game.UI.Gumps.AdventureFxGump.Receber(_world, 2, advAlvo, 0, 0, 0, 1, 0, 2000);
+
+                    return;
+                }
+            }
+
             if (hasparticles)
             {
                 Log.Warn("Unhandled particles in an effects packet.");
