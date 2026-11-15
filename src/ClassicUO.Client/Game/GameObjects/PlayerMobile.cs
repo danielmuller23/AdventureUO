@@ -294,6 +294,14 @@ namespace ClassicUO.Game.GameObjects
 
         public void AddBuff(BuffIconType type, ushort graphic, uint time, string text, string title = "")
         {
+            // ADVENTURE: o buff da arrancada vai para a barra fixa propria, e nao para a barra de buffs
+            if ((ushort)type == AdventureSprintGump.BUFF_TYPE)
+            {
+                AdventureSprintGump.Ativar(World, time);
+
+                return;
+            }
+
             _buffIcons[type] = new BuffIcon(type, graphic, time, text, title);
 
             if (ProfileManager.CurrentProfile.UseImprovedBuffBar)
@@ -306,6 +314,14 @@ namespace ClassicUO.Game.GameObjects
 
         public void RemoveBuff(BuffIconType graphic)
         {
+            // ADVENTURE: fim da arrancada = barra fixa volta a ficar escura
+            if ((ushort)graphic == AdventureSprintGump.BUFF_TYPE)
+            {
+                AdventureSprintGump.Desativar();
+
+                return;
+            }
+
             if (_buffIcons.TryGetValue(graphic, out BuffIcon ev))
             {
                 EventSink.InvokeOnBuffRemoved(null, new BuffEventArgs(ev));

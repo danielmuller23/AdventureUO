@@ -45,6 +45,9 @@ internal static class LoginComplete
             if (gumps != null)
                 foreach (Gump gump in gumps)
                     UIManager.Add(gump);
+
+            // ADVENTURE: barra fixa da arrancada, sempre na tela
+            AdventureSprintGump.AbrirSeFechada(world);
         }
     }
 }
