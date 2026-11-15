@@ -22,7 +22,7 @@ namespace ClassicUO.Game.UI.Gumps
         public string Name { get; }
         private readonly bool isBuffBar;
 
-        private GumpPic gumpPic;
+        private Control gumpPic; // ADVENTURE: pode ser gump (GumpPic) ou arte de item (ResizableStaticPic)
 
         public BuffIconType buffIconType;
 
@@ -58,7 +58,16 @@ namespace ClassicUO.Game.UI.Gumps
 
             if (graphic != ushort.MaxValue)
             {
-                gumpPic = new GumpPic(0, 2, graphic, 0);
+                if (graphic >= 0x8000)
+                {
+                    // ADVENTURE: no buff.txt, valor >= 32768 (0x8000) = icone do art.mul (aba Items).
+                    // Arte = valor - 0x8000. Ex.: raio 0x3A5C -> 0xBA5C (47708). Pintado com a cor da barra.
+                    gumpPic = new ResizableStaticPic((uint)(graphic - 0x8000), 28, 28) { X = 0, Y = 1, Hue = _hue };
+                }
+                else
+                {
+                    gumpPic = new GumpPic(0, 2, graphic, 0);
+                }
                 background.X = gumpPic.Width;
                 background.Width = COOL_DOWN_WIDTH - gumpPic.Width;
 
