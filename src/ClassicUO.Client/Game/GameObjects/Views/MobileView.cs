@@ -28,7 +28,7 @@ namespace ClassicUO.Game.GameObjects
         private static readonly ushort[] AdvHuesFumaca = { 0x0013, 0x0014, 0x0015, 0x0014, 0x0015 };
         private static readonly ushort[] AdvHuesGeloPinta = { 0x0482 };            // pinta o corpo de gelo (branco-azulado)
         private static readonly ushort[] AdvHuesGelo = { 0x0481, 0x0482 };       // brilho branco piscando por cima
-        private static readonly ushort[] AdvHuesEscudo = { 0x0035, 0x0030, 0x0035, 0x0036, 0x0030, 0x0035 };   // aura dourada do Protection
+        private static readonly ushort[] AdvHuesEscudo = { 0x0059, 0x0058, 0x0059, 0x005A, 0x0058, 0x0059 };   // aura AZUL do Protection (padrao das magias de protecao)
 
         private const int SIT_OFFSET_Y = 4;
         private EquipConvData? _equipConvData;
@@ -680,7 +680,7 @@ namespace ClassicUO.Game.GameObjects
                     }
                 }
 
-                // ---- AURA (Protection): copias do corpo em luz dourada, cada uma MAIOR, respirando ----
+                // ---- AURA (Protection): copias do corpo em luz azul, cada uma MAIOR, respirando ----
                 // No comeco a aura "explode" bem larga e depois fica pulsando em volta do corpo.
                 if (AdvEscudoAte != 0)
                 {

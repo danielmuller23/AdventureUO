@@ -4,8 +4,8 @@
 //  Tipo 1 = FURACAO de luz (curas): nasce pequeno e cresce.
 //  Tipo 2 = CORPO EM CHAMAS (Flamestrike)  -> corpo no MobileView.cs + brasas douradas subindo aqui
 //  Tipo 3 = ANEL DE AREA (Arch Cure / Arch Protection): anel abrindo no chao + brilhos subindo
-//  Tipo 4 = AURA (Protection): corpo em luz dourada com aura larga pulsando (MobileView) + onda no chao
-//  Tipo 5 = FRAGMENTOS (Magic Reflection): cacos de espelho em circulo largo voam e encaixam no corpo
+//  Tipo 4 = AURA (Protection): corpo em luz azul com aura larga pulsando (MobileView) + brilhos piscando
+//  Tipo 5 = FRAGMENTOS (Magic Reflection): cacos azuis em circulo largo voam e formam uma cupula no corpo
 //  Tipo 6 = MALDICAO (Curse): corpo escuro (MobileView) + fumaca roxa subindo
 //  Tipo 7 = GELO (Paralyze): so o corpo congelado (MobileView)
 //  Tipo 8 = CHUVA DE METEOROS (Meteor Swarm): bolas de fogo caindo do ceu e explodindo
@@ -305,32 +305,31 @@ namespace ClassicUO.Game.UI.Gumps
             }
         }
 
-        // ---------------- 4: AURA (Protection): so a onda dourada no chao (a aura no corpo e no MobileView) ----------------
+        // ---------------- 4: AURA (Protection): brilhos azuis piscando em volta (a aura no corpo e no MobileView) ----------------
         private static void DesenhaEscudo(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg, float sumir)
         {
-            Color ouro = new Color(255, 215, 90);
-            Color branco = new Color(255, 250, 220);
+            Color azul = new Color(90, 170, 255);
+            Color claro = new Color(200, 235, 255);
 
-            // 2 ondas saindo do pe quando a magia pega
-            for (int k = 0; k < 2; k++)
+            // brilhos piscando em volta do corpo, em varias alturas (como estrelinhas)
+            for (int p = 0; p < 34; p++)
             {
-                float f = (seg - k * 0.18f) / 0.7f;
+                double ang = Rnd(e.Semente, p + 30) * Math.PI * 2 + seg * 0.8;
+                float raio = 26 + Rnd(e.Semente, p + 60) * 26;
+                int px = pe.X + (int)(Math.Cos(ang) * raio);
+                int py = pe.Y - 8 - (int)(Rnd(e.Semente, p + 90) * 95) + (int)(Math.Sin(ang) * raio * 0.3f) - (int)(seg * 10);
+                float pisca = (float)Math.Abs(Math.Sin(seg * (4 + Rnd(e.Semente, p) * 5) + p));
+                int tam = p % 4 == 0 ? 6 : 4;
+                Color c = p % 3 == 0 ? Color.White : (p % 3 == 1 ? claro : azul);
 
-                if (f > 0f && f < 1f)
+                Ponto(batcher, px, py, tam, c, pisca * sumir);
+
+                // brilho em cruz nos maiores
+                if (tam == 6 && pisca > 0.7f)
                 {
-                    float sai = 1f - (1f - f) * (1f - f);
-                    Anel(batcher, pe.X, pe.Y, (int)(20 + sai * 110), 0.4f, 72, 4, k == 0 ? branco : ouro, (1f - f) * 0.9f);
+                    Linha(batcher, px - 6, py, px + 6, py, 1, Color.White, (pisca - 0.7f) * 3f * sumir);
+                    Linha(batcher, px, py - 6, px, py + 6, 1, Color.White, (pisca - 0.7f) * 3f * sumir);
                 }
-            }
-
-            // faiscas douradas subindo devagar em volta
-            for (int p = 0; p < 14; p++)
-            {
-                float fase = (Rnd(e.Semente, p) + seg * 0.6f) % 1f;
-                double ang = Rnd(e.Semente, p + 30) * Math.PI * 2;
-                int px = pe.X + (int)(Math.Cos(ang) * 34);
-                int py = pe.Y + (int)(Math.Sin(ang) * 12) - (int)(fase * 100);
-                Ponto(batcher, px, py, 3, p % 2 == 0 ? branco : ouro, (float)Math.Sin(Math.PI * fase) * 0.8f * sumir);
             }
         }
 
@@ -341,9 +340,9 @@ namespace ClassicUO.Game.UI.Gumps
         {
             float escala = 0.9f + 0.2f * e.Tamanho;
             Color corpo = e.Cor;                                   // prata-azulado (vem do servidor)
-            Color borda = new Color(255, 215, 90);                 // borda dourada
+            Color borda = new Color(170, 220, 255);                // borda azul clara
             Color claro = Color.Lerp(e.Cor, Color.White, 0.7f);
-            const int N = 12;
+            const int N = 26;   // cacos: formam uma CUPULA em volta do corpo
 
             float vem = t < 0.15f ? 0f : Math.Min(1f, (t - 0.15f) / 0.27f);   // 0 longe -> 1 encaixado
             float suave = vem * vem * (3 - 2 * vem);
@@ -353,7 +352,7 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 float rf = 0.85f + 0.3f * Rnd(e.Semente, i);
                 double angIni = i / (double)N * Math.PI * 2;
-                int anel = i % 3;                                  // pernas, cintura, peito
+                int anel = i % 4;                                  // 4 alturas da cupula: base, meio, alto, topo
 
                 // posicao longe (circulo largo, uns 5 tiles)
                 double angLonge = angIni + suave * 2.2;            // gira enquanto vem
@@ -361,10 +360,12 @@ namespace ClassicUO.Game.UI.Gumps
                 int xLonge = pe.X + (int)(Math.Cos(angLonge) * raioLonge);
                 int yLonge = pe.Y - 30 + (int)(Math.Sin(angLonge) * raioLonge * 0.5f);
 
-                // posicao encaixada no corpo (gira devagar)
-                double angCorpo = angIni + anel * 0.5 + seg * 1.2;
-                int xCorpo = pe.X + (int)(Math.Cos(angCorpo) * 28 * escala);
-                int yCorpo = pe.Y - 18 - anel * 26 + (int)(Math.Sin(angCorpo) * 10);
+                // posicao encaixada na CUPULA (meia esfera em volta do corpo, gira devagar)
+                double lat = anel * (Math.PI / 2) / 4.2;                          // 0 = base, ~pi/2 = topo
+                double angCorpo = angIni * 1.0 + anel * 0.4 + seg * 1.2;
+                float raioCup = (float)(46 * escala * Math.Cos(lat));
+                int xCorpo = pe.X + (int)(Math.Cos(angCorpo) * raioCup);
+                int yCorpo = pe.Y - 12 - (int)(Math.Sin(lat) * 95 * escala) + (int)(Math.Sin(angCorpo) * raioCup * 0.35f);
 
                 int x = (int)(xLonge + (xCorpo - xLonge) * suave);
                 int y = (int)(yLonge + (yCorpo - yLonge) * suave);
@@ -378,7 +379,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                 bool frente = vem < 1f || Math.Sin(angCorpo) > 0;
                 float alfa = (t < 0.15f ? t / 0.15f : 1f) * (frente ? 1f : 0.45f) * (1f - estilhaca);
-                int tam = (int)((vem < 1f ? 11f : 9f) * escala);
+                int tam = (int)((vem < 1f ? 10f : 8f) * escala);
 
                 // rastro enquanto voa
                 if (vem > 0f && vem < 1f)
