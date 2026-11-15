@@ -24,7 +24,7 @@ namespace ClassicUO.Game.GameObjects
         private static readonly ushort[] AdvHuesFogo = { 0x0021, 0x0026, 0x002B, 0x002E, 0x0030, 0x0030, 0x0035, 0x0035, 0x0036, 0x0036, 0x0035 };   // mais dourado nas pontas
         private static readonly ushort[] AdvHuesEscuro = { 0x0001 };
         private static readonly ushort[] AdvHuesFumaca = { 0x0013, 0x0014, 0x0015, 0x0014, 0x0015 };
-        private static readonly ushort[] AdvHuesGelo = { 0x0480, 0x0059, 0x0480 };
+        private static readonly ushort[] AdvHuesGelo = { 0x0481, 0x0481, 0x0480 };   // branco gelo (bem visivel)
 
         private const int SIT_OFFSET_Y = 4;
         private EquipConvData? _equipConvData;
@@ -665,8 +665,8 @@ namespace ClassicUO.Game.GameObjects
                     else
                     {
                         float sumir = Math.Min(1f, (AdvGeloAte - Time.Ticks) / 400f);
-                        float pisca = 0.85f + 0.15f * (float)Math.Sin(advT * 6);
-                        AdvCamadas(AdvHuesGelo, 0.55f * pisca, 0.15f, 0.04f, 0, 0, sumir, true, 1);
+                        float pisca = 0.55f + 0.45f * (float)Math.Sin(advT * 9);   // pisca forte: identifica quem esta paralisado
+                        AdvCamadas(AdvHuesGelo, 0.75f * pisca, 0.2f, 0.05f, 0, 0, sumir, true, 1);
                     }
                 }
 

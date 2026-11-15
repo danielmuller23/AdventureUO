@@ -417,14 +417,14 @@ namespace ClassicUO.Game.UI.Gumps
         private static void DesenhaMeteoros(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg)
         {
             float total = (e.Fim - e.Inicio) / 1000f;
-            int qtd = 5 + e.Tamanho * 2;
+            int qtd = 12 + e.Tamanho * 3;   // area grande: muitos meteoros
             Color laranja = new Color(255, 130, 20);
             Color amarelo = new Color(255, 230, 90);
             Color vermelho = new Color(255, 50, 10);
 
             for (int m = 0; m < qtd; m++)
             {
-                float comeca = Rnd(e.Semente, m) * total * 0.55f;   // cada meteoro sai numa hora
+                float comeca = Rnd(e.Semente, m) * total * 0.65f;   // cada meteoro sai numa hora
                 float queda = 0.5f;                                 // tempo caindo (s)
                 float f = (seg - comeca) / queda;
 
@@ -433,9 +433,9 @@ namespace ClassicUO.Game.UI.Gumps
                     continue;
                 }
 
-                // onde cai: espalhado em volta do ponto (uns 3 tiles)
+                // onde cai: espalhado em volta do ponto
                 double ang = Rnd(e.Semente, m + 40) * Math.PI * 2;
-                float dist = (float)Math.Sqrt(Rnd(e.Semente, m + 80)) * 110;
+                float dist = (0.25f + 0.75f * (float)Math.Sqrt(Rnd(e.Semente, m + 80))) * 210;   // espalhados ao redor (uns 5 tiles)
                 int ix = pe.X + (int)(Math.Cos(ang) * dist);
                 int iy = pe.Y + (int)(Math.Sin(ang) * dist * 0.45f);
                 int desvio = (int)((Rnd(e.Semente, m + 120) - 0.5f) * 120);   // vem levemente de lado, cada um de um jeito
@@ -538,7 +538,7 @@ namespace ClassicUO.Game.UI.Gumps
                 float t = (Time.Ticks - e.Inicio) / (float)(e.Fim - e.Inicio);
                 float seg = (Time.Ticks - e.Inicio) / 1000f;
                 float pulso = (float)Math.Pow(Math.Abs(Math.Sin(seg * Math.PI / 0.55)), 3);   // treme mais forte a cada onda
-                forca = Math.Max(forca, (1f - t) * (2f + 4f * pulso));
+                forca = Math.Max(forca, (1f - t) * (4f + 7f * pulso));   // forca do tremor (pixels)
             }
 
             if (forca <= 0.5f)
