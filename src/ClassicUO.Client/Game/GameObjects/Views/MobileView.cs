@@ -16,8 +16,15 @@ namespace ClassicUO.Game.GameObjects
 {
     public partial class Mobile
     {
-        // ADVENTURE: corpo em chamas ate este Time.Ticks (pacote 0xBF 0xAD04 tipo 2). 0 = sem fogo
-        public uint AdvFogoAte;
+        // ADVENTURE: efeitos no corpo ate este Time.Ticks (pacote 0xBF 0xAD04). 0 = sem efeito
+        public uint AdvFogoAte;       // tipo 2 Flamestrike
+        public uint AdvMaldicaoAte;   // tipo 6 Curse
+        public uint AdvGeloAte;       // tipo 7 Paralyze
+        // cores (hues do UO). Fogo de dentro pra fora: vermelho forte -> laranja -> amarelo nas pontas
+        private static readonly ushort[] AdvHuesFogo = { 0x0021, 0x0021, 0x0026, 0x002B, 0x002B, 0x002E, 0x0030, 0x0035, 0x0035, 0x0036 };
+        private static readonly ushort[] AdvHuesEscuro = { 0x0001 };
+        private static readonly ushort[] AdvHuesFumaca = { 0x0013, 0x0014, 0x0015, 0x0014, 0x0015 };
+        private static readonly ushort[] AdvHuesGelo = { 0x0480, 0x0059, 0x0480 };
 
         private const int SIT_OFFSET_Y = 4;
         private EquipConvData? _equipConvData;
@@ -586,58 +593,83 @@ namespace ClassicUO.Game.GameObjects
                 }
             }
             
-            // ADVENTURE: CORPO EM CHAMAS. Redesenha o proprio corpo do personagem varias vezes
-            // em fogo transparente, cada copia mais alta, tremendo e mais fraca: viram labaredas
-            // no formato do corpo subindo. So visual, dura o tempo que o servidor mandou.
-            if (AdvFogoAte != 0)
+            // ADVENTURE: EFEITOS NO CORPO (pacote 0xBF 0xAD04). O proprio desenho do personagem e
+            // redesenhado varias vezes por cima, tingido, maior e mais alto a cada copia.
+            //   Fogo (Flamestrike) = labaredas vivas subindo (vermelho -> laranja -> amarelo), luz somada
+            //   Maldicao (Curse)   = corpo escurecido + fumaca roxa subindo devagar
+            //   Gelo (Paralyze)    = corpo congelado azul-gelo brilhando, parado
+            // So visual; dura o tempo que o servidor mandou.
+            if (AdvFogoAte != 0 || AdvMaldicaoAte != 0 || AdvGeloAte != 0)
             {
-                if (Time.Ticks >= AdvFogoAte)
-                {
-                    AdvFogoAte = 0;
-                }
-                else
-                {
-                    // Copias cada vez MAIORES (escala), mais altas e mais fracas: o fogo cresce para cima
-                    ushort[] advHuesFogo = { 0x0026, 0x002B, 0x0026, 0x002B, 0x0035, 0x002B, 0x0035, 0x0035, 0x0035 }; // vermelho, laranja, amarelo
-                    double advT = Time.Ticks / 1000.0;
-                    float advSumir = Math.Min(1f, (AdvFogoAte - Time.Ticks) / 400f);       // apaga suave no fim
-                    float advEscalaOriginal = Scale;
-                    Rectangle advFrameOriginal = FrameInfo;                               // nao mexe na area de clique
+                float advEscalaOriginal = Scale;
+                Rectangle advFrameOriginal = FrameInfo;   // nao mexe na area de clique
+                double advT = Time.Ticks / 1000.0;
 
-                    for (int advK = 0; advK < advHuesFogo.Length; advK++)
+                void AdvCamadas(ushort[] hues, float alfaIni, float alfaPasso, float escPasso, int sobePasso, int treme, float sumir, bool aditivo, double velocidade)
+                {
+                    if (aditivo)
                     {
-                        int advTreme = (int)(Math.Sin(advT * 17 + advK * 1.9) * (2 + advK / 3));
-                        int advSobe = advK * 7 + (int)(Math.Abs(Math.Sin(advT * 9 + advK)) * 6);
-                        float advAlfa = (0.17f - advK * 0.014f) * advSumir;
-                        Scale = advEscalaOriginal * (1.1f + advK * 0.13f + (float)Math.Sin(advT * 11 + advK) * 0.04f);
+                        batcher.SetBlendState(BlendState.Additive);   // luz SOMADA: cor viva em vez de bege
+                    }
 
-                        DrawInternal(
-                            batcher,
-                            this,
-                            null,
-                            drawX + advTreme,
-                            drawY - advSobe,
-                            ShaderHueTranslator.GetHueVector(0, false, advAlfa),
-                            IsFlipped,
-                            animIndex,
-                            false,
-                            graphic,
-                            animGroup,
-                            dir,
-                            isHuman,
-                            false,
-                            false,
-                            isGargoyle,
-                            depth + 2f,
-                            mountOffsetY,
-                            advHuesFogo[advK],
-                            charSitting
-                        );
+                    for (int k = 0; k < hues.Length; k++)
+                    {
+                        int dx = treme == 0 ? 0 : (int)(Math.Sin(advT * 17 * velocidade + k * 1.9) * (treme + k / 3));
+                        int sobe = k * sobePasso + (sobePasso == 0 ? 0 : (int)(Math.Abs(Math.Sin(advT * 9 * velocidade + k)) * 6));
+                        float alfa = Math.Max(0f, (alfaIni - k * alfaPasso) * sumir);
+                        Scale = advEscalaOriginal * (1f + k * escPasso + (escPasso == 0 ? 0f : (float)Math.Sin(advT * 11 * velocidade + k) * 0.04f));
+
+                        DrawInternal(batcher, this, null, drawX + dx, drawY - sobe, ShaderHueTranslator.GetHueVector(0, false, alfa),
+                            IsFlipped, animIndex, false, graphic, animGroup, dir, isHuman, false, false, isGargoyle,
+                            depth + 2f + k * 0.01f, mountOffsetY, hues[k], charSitting);
+                    }
+
+                    if (aditivo)
+                    {
+                        batcher.SetBlendState(null);
                     }
 
                     Scale = advEscalaOriginal;
-                    FrameInfo = advFrameOriginal;
                 }
+
+                // ---- MALDICAO (Curse): escurece e solta fumaca roxa ----
+                if (AdvMaldicaoAte != 0)
+                {
+                    if (Time.Ticks >= AdvMaldicaoAte) { AdvMaldicaoAte = 0; }
+                    else
+                    {
+                        float sumir = Math.Min(1f, (AdvMaldicaoAte - Time.Ticks) / 500f);
+                        AdvCamadas(AdvHuesEscuro, 0.55f, 0f, 0f, 0, 0, sumir, false, 1);                         // corpo escuro
+                        AdvCamadas(AdvHuesFumaca, 0.30f, 0.05f, 0.10f, 9, 2, sumir, true, 0.4); // fumaca roxa
+                    }
+                }
+
+                // ---- GELO (Paralyze): congelado, brilho azul parado ----
+                if (AdvGeloAte != 0)
+                {
+                    if (Time.Ticks >= AdvGeloAte) { AdvGeloAte = 0; }
+                    else
+                    {
+                        float sumir = Math.Min(1f, (AdvGeloAte - Time.Ticks) / 400f);
+                        float pisca = 0.85f + 0.15f * (float)Math.Sin(advT * 6);
+                        AdvCamadas(AdvHuesGelo, 0.55f * pisca, 0.15f, 0.04f, 0, 0, sumir, true, 1);
+                    }
+                }
+
+                // ---- FOGO (Flamestrike): labaredas vivas subindo ----
+                if (AdvFogoAte != 0)
+                {
+                    if (Time.Ticks >= AdvFogoAte) { AdvFogoAte = 0; }
+                    else
+                    {
+                        float sumir = Math.Min(1f, (AdvFogoAte - Time.Ticks) / 400f);
+                        // de dentro pra fora: vermelho forte -> laranja -> amarelo nas pontas
+                        AdvCamadas(AdvHuesFogo, 0.60f, 0.05f, 0.13f, 7, 2, sumir, true, 1);
+                    }
+                }
+
+                Scale = advEscalaOriginal;
+                FrameInfo = advFrameOriginal;
             }
 
             // drawY + FrameInfo.Y is the top of the drawn sprite; the simple healthbar and name stack on it.

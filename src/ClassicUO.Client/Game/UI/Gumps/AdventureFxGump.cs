@@ -1,14 +1,21 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // ==========================================================================
 // ADVENTURE: EFEITOS DE MAGIA modernos (desenhados pelo proprio cliente).
-//  Tipo 1 = FURACAO de luz (curas): nasce pequeno e cresce; aneis girando que sobem e abrem para cima,
-//           particulas em espiral e anel no chao. Cor e tamanho vem do servidor.
-//  Tipo 2 = CORPO EM CHAMAS (Flamestrike): o proprio desenho do personagem e
-//           redesenhado em fogo transparente subindo (ver MobileView.cs).
+//  Tipo 1 = FURACAO de luz (curas): nasce pequeno e cresce.
+//  Tipo 2 = CORPO EM CHAMAS (Flamestrike)  -> desenhado no MobileView.cs
+//  Tipo 3 = ANEL DE AREA (Arch Cure / Arch Protection): anel abrindo no chao + brilhos subindo
+//  Tipo 4 = BOLHA (Protection): cupula azul em volta do corpo que pulsa e some
+//  Tipo 5 = ESPELHO (Magic Reflection): anel prateado girando + estrela de brilho
+//  Tipo 6 = MALDICAO (Curse): corpo escuro (MobileView) + fumaca roxa subindo
+//  Tipo 7 = GELO (Paralyze): corpo congelado (MobileView) + cristais de gelo no chao
+//  Tipo 8 = CHUVA DE METEOROS (Meteor Swarm): bolas de fogo caindo do ceu e explodindo
+//  Tipo 9 = TERREMOTO (Earthquake): ondas de choque no chao + pedras pulando
 //
 // Pacote proprio 0xBF sub 0xAD04 (18 bytes):
 //   [tipo byte][alvo dword][R byte][G byte][B byte][tamanho byte][valor word][duracao word ms]
 //   Sphere: SENDPACKET 0bf w18 w0AD04 <tipo> d<alvo> <r> <g> <b> <tamanho> w<valor> w<ms>
+//   Se o tipo vier com +128 (ex.: 131 = tipo 3) o efeito e num PONTO DO CHAO:
+//     alvo = X*65536 + Y   e   valor = Z + 128
 // ==========================================================================
 
 using System;
@@ -17,6 +24,7 @@ using ClassicUO.Game.GameObjects;
 using ClassicUO.Game.Managers;
 using ClassicUO.Renderer;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace ClassicUO.Game.UI.Gumps
 {
@@ -24,13 +32,18 @@ namespace ClassicUO.Game.UI.Gumps
     {
         private sealed class Efeito
         {
+            public int Tipo;
             public uint Alvo;
+            public bool NoChao;
+            public int PX, PY, PZ;
             public Color Cor;
             public int Tamanho;
+            public int Semente;
             public uint Inicio, Fim;
         }
 
         private static AdventureFxGump _instancia;
+        private static int _sementes;
         private readonly List<Efeito> _efeitos = new List<Efeito>();
 
         public AdventureFxGump(World world) : base(world, 0, 0)
@@ -53,17 +66,25 @@ namespace ClassicUO.Game.UI.Gumps
                 ms = 1500;
             }
 
-            if (tipo == 2)
+            bool noChao = (tipo & 0x80) != 0;
+            tipo &= 0x7F;
+
+            // Efeitos no proprio corpo: so marca o mobile, quem desenha e o MobileView
+            if (!noChao && (tipo == 2 || tipo == 6 || tipo == 7))
             {
-                // Corpo em chamas: so marca o mobile; quem desenha e o MobileView
                 Mobile m = world.Mobiles.Get(alvo);
 
                 if (m != null)
                 {
-                    m.AdvFogoAte = Time.Ticks + ms;
+                    if (tipo == 2) m.AdvFogoAte = Time.Ticks + ms;
+                    else if (tipo == 6) m.AdvMaldicaoAte = Time.Ticks + ms;
+                    else m.AdvGeloAte = Time.Ticks + ms;
                 }
 
-                return;
+                if (tipo == 2)
+                {
+                    return;   // fogo nao tem parte extra
+                }
             }
 
             if (_instancia == null || _instancia.IsDisposed)
@@ -73,27 +94,63 @@ namespace ClassicUO.Game.UI.Gumps
 
             _instancia._efeitos.Add(new Efeito
             {
+                Tipo = tipo,
                 Alvo = alvo,
+                NoChao = noChao,
+                PX = (int)(alvo >> 16),
+                PY = (int)(alvo & 0xFFFF),
+                PZ = valor - 128,
                 Cor = new Color(r, g, b),
                 Tamanho = Math.Max(1, Math.Min((int)tamanho, 4)),
+                Semente = ++_sementes * 7919,
                 Inicio = Time.Ticks,
                 Fim = Time.Ticks + ms
             });
         }
 
-        private static Point Tela(Mobile m)
+        // Pes do alvo na tela
+        private bool Tela(Efeito e, out Point pe)
         {
-            int wx = (int)(m.RealScreenPosition.X + m.Offset.X + 22);
-            int wy = (int)(m.RealScreenPosition.Y + (m.Offset.Y - m.Offset.Z)) + 18;
-            Point p = Client.Game.Scene.Camera.WorldToScreen(new Point(wx, wy));
-            Camera camera = Client.Game.Scene.Camera;
+            pe = Point.Zero;
+            int wx, wy;
 
-            return new Point(p.X + camera.Bounds.X, p.Y + camera.Bounds.Y);
+            if (e.NoChao)
+            {
+                PlayerMobile pl = World.Player;
+
+                if (pl == null)
+                {
+                    return false;
+                }
+
+                int dx = e.PX - pl.X;
+                int dy = e.PY - pl.Y;
+                wx = pl.RealScreenPosition.X + (dx - dy) * 22 + 22;
+                wy = pl.RealScreenPosition.Y + (dx + dy) * 22 - (e.PZ - pl.Z) * 4 + 18;
+            }
+            else
+            {
+                Mobile m = World.Mobiles.Get(e.Alvo);
+
+                if (m == null)
+                {
+                    return false;
+                }
+
+                wx = (int)(m.RealScreenPosition.X + m.Offset.X + 22);
+                wy = (int)(m.RealScreenPosition.Y + (m.Offset.Y - m.Offset.Z)) + 18;
+            }
+
+            Camera camera = Client.Game.Scene.Camera;
+            Point p = camera.WorldToScreen(new Point(wx, wy));
+            pe = new Point(p.X + camera.Bounds.X, p.Y + camera.Bounds.Y);
+
+            return true;
         }
 
         private static void Ponto(UltimaBatcher2D batcher, int x, int y, int tam, Color cor, float alpha)
         {
-            if (alpha <= 0.01f)
+            if (alpha <= 0.01f || tam <= 0)
             {
                 return;
             }
@@ -101,8 +158,46 @@ namespace ClassicUO.Game.UI.Gumps
             batcher.Draw(SolidColorTextureCache.GetTexture(cor), new Rectangle(x - tam / 2, y - tam / 2, tam, tam), ShaderHueTranslator.GetHueVector(0, false, Math.Min(alpha, 1f)));
         }
 
+        // Linha feita de pontos (para raios, rastros, rachaduras)
+        private static void Linha(UltimaBatcher2D batcher, int x1, int y1, int x2, int y2, int tam, Color cor, float alpha)
+        {
+            int passos = Math.Max(1, Math.Max(Math.Abs(x2 - x1), Math.Abs(y2 - y1)) / Math.Max(1, tam / 2));
+
+            for (int i = 0; i <= passos; i++)
+            {
+                float f = i / (float)passos;
+                Ponto(batcher, x1 + (int)((x2 - x1) * f), y1 + (int)((y2 - y1) * f), tam, cor, alpha);
+            }
+        }
+
+        // Elipse no chao (perspectiva do UO: achatada)
+        private static void Anel(UltimaBatcher2D batcher, int cx, int cy, int raio, float achata, int pontos, int tam, Color cor, float alpha, float giro = 0f)
+        {
+            for (int a = 0; a < pontos; a++)
+            {
+                double ang = a / (double)pontos * Math.PI * 2 + giro;
+                Ponto(batcher, cx + (int)(Math.Cos(ang) * raio), cy + (int)(Math.Sin(ang) * raio * achata), tam, cor, alpha);
+            }
+        }
+
+        // Numero "aleatorio" fixo por efeito (o mesmo a cada quadro, para nao piscar)
+        private static float Rnd(int semente, int i)
+        {
+            uint h = (uint)(semente * 374761393 + i * 668265263);
+            h = (h ^ (h >> 13)) * 1274126177u;
+
+            return ((h ^ (h >> 16)) & 0xFFFF) / 65535f;
+        }
+
         public override bool Draw(UltimaBatcher2D batcher, int x, int y)
         {
+            if (_efeitos.Count == 0)
+            {
+                return true;
+            }
+
+            batcher.SetBlendState(BlendState.Additive);   // luz somada: cores vivas e brilhantes
+
             for (int i = _efeitos.Count - 1; i >= 0; i--)
             {
                 Efeito e = _efeitos[i];
@@ -113,65 +208,328 @@ namespace ClassicUO.Game.UI.Gumps
                     continue;
                 }
 
-                Mobile m = World.Mobiles.Get(e.Alvo);
-
-                if (m == null)
+                if (!Tela(e, out Point pe))
                 {
                     continue;
                 }
 
-                Point pe = Tela(m);   // pes do alvo na tela
                 float t = (Time.Ticks - e.Inicio) / (float)(e.Fim - e.Inicio);   // 0 -> 1
+                float seg = (Time.Ticks - e.Inicio) / 1000f;                     // segundos desde o inicio
                 float sumir = t < 0.75f ? 1f : 1f - (t - 0.75f) / 0.25f;         // some no final
-                float cresce = 0.3f + 0.7f * Math.Min(1f, t / 0.45f);           // comeca pequeno e vai crescendo
-                float escala = (1.0f + 0.4f * e.Tamanho) * cresce;               // 1 = pequeno, 4 = gigante (bem maior que antes)
-                int altura = (int)(170 * escala);
-                float giro = (Time.Ticks - e.Inicio) / 1000f * 7f;
-                Color clara = Color.Lerp(e.Cor, Color.White, 0.55f);
-                Color dourada = new Color(255, 240, 150);
 
-                // Anel no chao abrindo
-                int rc = (int)((25 + 70 * t) * escala);
-
-                for (int a = 0; a < 48; a++)
+                switch (e.Tipo)
                 {
-                    double ang = a / 48.0 * Math.PI * 2;
-                    Ponto(batcher, pe.X + (int)(Math.Cos(ang) * rc), pe.Y + (int)(Math.Sin(ang) * rc * 0.35), 3, dourada, 0.8f * (1f - t));
-                }
-
-                // Aneis do funil girando e subindo (abre para cima)
-                for (int k = 0; k < 9; k++)
-                {
-                    float fase = (k / 9f + t * 0.9f) % 1f;
-                    int yy = pe.Y - (int)(fase * altura);
-                    int raio = (int)((18 + fase * 70) * escala);
-                    float alfa = (float)Math.Sin(Math.PI * fase) * 0.55f * sumir;
-
-                    for (int a = 0; a < 36; a++)
-                    {
-                        double ang = a / 36.0 * Math.PI * 2 + giro;
-                        Ponto(batcher, pe.X + (int)(Math.Cos(ang) * raio), yy + (int)(Math.Sin(ang) * raio * 0.28), 2, e.Cor, alfa);
-                    }
-                }
-
-                // Particulas em espiral (3 bracos)
-                for (int braco = 0; braco < 3; braco++)
-                {
-                    for (int p = 0; p < 26; p++)
-                    {
-                        float fase = (p / 26f + t * 1.1f) % 1f;
-                        double ang = fase * Math.PI * 6 + braco * 2 * Math.PI / 3 + giro;
-                        int raio = (int)((18 + fase * 70) * escala);
-                        int px = pe.X + (int)(Math.Cos(ang) * raio);
-                        int py = pe.Y - (int)(fase * altura) + (int)(Math.Sin(ang) * raio * 0.28);
-                        Color c = p % 3 == 0 ? Color.White : (p % 3 == 1 ? clara : dourada);
-                        int tam = Math.Sin(ang) > 0 ? 4 : 3;   // na frente fica maior
-                        Ponto(batcher, px, py, tam, c, (float)Math.Sin(Math.PI * fase) * sumir);
-                    }
+                    case 1: DesenhaFuracao(batcher, e, pe, t, sumir); break;
+                    case 3: DesenhaAnelArea(batcher, e, pe, t, seg, sumir); break;
+                    case 4: DesenhaBolha(batcher, e, pe, t, seg, sumir); break;
+                    case 5: DesenhaEspelho(batcher, e, pe, t, seg, sumir); break;
+                    case 6: DesenhaFumaca(batcher, e, pe, t, seg, sumir); break;
+                    case 7: DesenhaCristais(batcher, e, pe, t, seg); break;
+                    case 8: DesenhaMeteoros(batcher, e, pe, t, seg); break;
+                    case 9: DesenhaTerremoto(batcher, e, pe, t, seg, sumir); break;
                 }
             }
 
+            batcher.SetBlendState(null);
+
             return true;
+        }
+
+        // ---------------- 1: FURACAO (curas) ----------------
+        private static void DesenhaFuracao(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float sumir)
+        {
+            float cresce = 0.3f + 0.7f * Math.Min(1f, t / 0.45f);           // comeca pequeno e vai crescendo
+            float escala = (1.0f + 0.4f * e.Tamanho) * cresce;
+            int altura = (int)(170 * escala);
+            float giro = (Time.Ticks - e.Inicio) / 1000f * 7f;
+            Color clara = Color.Lerp(e.Cor, Color.White, 0.55f);
+            Color dourada = new Color(255, 240, 150);
+
+            Anel(batcher, pe.X, pe.Y, (int)((25 + 70 * t) * escala), 0.35f, 48, 3, dourada, 0.8f * (1f - t));
+
+            for (int k = 0; k < 9; k++)
+            {
+                float fase = (k / 9f + t * 0.9f) % 1f;
+                int raio = (int)((18 + fase * 70) * escala);
+                float alfa = (float)Math.Sin(Math.PI * fase) * 0.55f * sumir;
+                Anel(batcher, pe.X, pe.Y - (int)(fase * altura), raio, 0.28f, 36, 2, e.Cor, alfa, giro);
+            }
+
+            for (int braco = 0; braco < 3; braco++)
+            {
+                for (int p = 0; p < 26; p++)
+                {
+                    float fase = (p / 26f + t * 1.1f) % 1f;
+                    double ang = fase * Math.PI * 6 + braco * 2 * Math.PI / 3 + giro;
+                    int raio = (int)((18 + fase * 70) * escala);
+                    int px = pe.X + (int)(Math.Cos(ang) * raio);
+                    int py = pe.Y - (int)(fase * altura) + (int)(Math.Sin(ang) * raio * 0.28);
+                    Color c = p % 3 == 0 ? Color.White : (p % 3 == 1 ? clara : dourada);
+                    Ponto(batcher, px, py, Math.Sin(ang) > 0 ? 4 : 3, c, (float)Math.Sin(Math.PI * fase) * sumir);
+                }
+            }
+        }
+
+        // ---------------- 3: ANEL DE AREA (Arch Cure / Arch Protection) ----------------
+        private static void DesenhaAnelArea(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg, float sumir)
+        {
+            float escala = 0.8f + 0.3f * e.Tamanho;
+            Color clara = Color.Lerp(e.Cor, Color.White, 0.5f);
+            float abre = Math.Min(1f, t / 0.5f);
+
+            // 3 aneis abrindo do centro para fora
+            for (int k = 0; k < 3; k++)
+            {
+                float f = Math.Max(0f, abre - k * 0.15f);
+                int raio = (int)((20 + 110 * f) * escala);
+                Anel(batcher, pe.X, pe.Y, raio, 0.4f, 64, k == 0 ? 4 : 3, k == 0 ? clara : e.Cor, (0.9f - k * 0.25f) * sumir, seg * 1.5f);
+            }
+
+            // brilhos subindo dentro da area
+            for (int p = 0; p < 40; p++)
+            {
+                float fase = (Rnd(e.Semente, p) + seg * 0.8f) % 1f;
+                double ang = Rnd(e.Semente, p + 100) * Math.PI * 2;
+                float dist = Rnd(e.Semente, p + 200) * 120 * escala * abre;
+                int px = pe.X + (int)(Math.Cos(ang) * dist);
+                int py = pe.Y + (int)(Math.Sin(ang) * dist * 0.4f) - (int)(fase * 90 * escala);
+                Ponto(batcher, px, py, p % 4 == 0 ? 4 : 3, p % 3 == 0 ? Color.White : clara, (float)Math.Sin(Math.PI * fase) * sumir);
+            }
+        }
+
+        // ---------------- 4: BOLHA (Protection) ----------------
+        private static void DesenhaBolha(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg, float sumir)
+        {
+            float escala = 0.9f + 0.25f * e.Tamanho;
+            float pulso = t < 0.25f ? t / 0.25f : 1f + 0.06f * (float)Math.Sin(seg * 8);   // infla e depois respira
+            int r = (int)(48 * escala * pulso);
+            int cy = pe.Y - (int)(42 * escala);
+            Color clara = Color.Lerp(e.Cor, Color.White, 0.6f);
+
+            // aneis horizontais (latitudes) formando a cupula
+            for (int k = -3; k <= 3; k++)
+            {
+                double lat = k / 3.5 * (Math.PI / 2);
+                int rr = (int)(Math.Cos(lat) * r);
+                int yy = cy + (int)(Math.Sin(lat) * r);
+                Anel(batcher, pe.X, yy, rr, 0.3f, 40, 2, e.Cor, 0.35f * sumir, seg * 2f);
+            }
+
+            // contorno da bolha
+            Anel(batcher, pe.X, cy, r, 1f, 72, 3, clara, 0.7f * sumir);
+
+            // reflexo (brilho) na parte de cima
+            for (int a = 0; a < 10; a++)
+            {
+                double ang = Math.PI * 1.15 + a * 0.07;
+                Ponto(batcher, pe.X + (int)(Math.Cos(ang) * r * 0.75), cy + (int)(Math.Sin(ang) * r * 0.75), 3, Color.White, 0.8f * sumir);
+            }
+
+            // onda no chao quando nasce
+            if (t < 0.4f)
+            {
+                Anel(batcher, pe.X, pe.Y, (int)(r * (0.5f + t * 2.5f)), 0.35f, 48, 3, clara, 1f - t / 0.4f);
+            }
+        }
+
+        // ---------------- 5: ESPELHO (Magic Reflection) ----------------
+        private static void DesenhaEspelho(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg, float sumir)
+        {
+            float escala = 0.9f + 0.25f * e.Tamanho;
+            Color prata = new Color(220, 230, 255);
+            int cy = pe.Y - (int)(35 * escala);
+
+            // dois aneis cruzados girando em volta do corpo
+            for (int a = 0; a < 48; a++)
+            {
+                double ang = a / 48.0 * Math.PI * 2 + seg * 4;
+                int r = (int)(40 * escala);
+                int x1 = pe.X + (int)(Math.Cos(ang) * r);
+                Ponto(batcher, x1, cy + (int)(Math.Sin(ang) * r * 0.35) - 12, 3, prata, 0.75f * sumir);
+                Ponto(batcher, x1, cy + (int)(Math.Sin(ang) * r * 0.35) + 12, 2, e.Cor, 0.6f * sumir);
+            }
+
+            // estilhacos de espelho girando
+            for (int p = 0; p < 8; p++)
+            {
+                double ang = p / 8.0 * Math.PI * 2 - seg * 3;
+                int r = (int)(52 * escala);
+                Ponto(batcher, pe.X + (int)(Math.Cos(ang) * r), cy + (int)(Math.Sin(ang) * r * 0.45), 5, Color.White, 0.9f * sumir);
+            }
+
+            // estrela de brilho no comeco
+            if (t < 0.35f)
+            {
+                float f = 1f - t / 0.35f;
+                int tam = (int)(60 * escala * (1f - f * 0.5f));
+                Linha(batcher, pe.X - tam, cy, pe.X + tam, cy, 3, Color.White, f);
+                Linha(batcher, pe.X, cy - tam, pe.X, cy + tam, 3, Color.White, f);
+                Ponto(batcher, pe.X, cy, 12, Color.White, f);
+            }
+        }
+
+        // ---------------- 6: FUMACA ROXA (Curse) ----------------
+        private static void DesenhaFumaca(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg, float sumir)
+        {
+            Color roxo = new Color(150, 40, 220);
+            Color escuro = new Color(90, 10, 140);
+
+            for (int p = 0; p < 30; p++)
+            {
+                float fase = (Rnd(e.Semente, p) + seg * 0.45f) % 1f;
+                int px = pe.X + (int)((Rnd(e.Semente, p + 50) - 0.5f) * 40 + Math.Sin(seg * 3 + p) * 8 * fase);
+                int py = pe.Y - 20 - (int)(fase * 110);
+                int tam = 4 + (int)(fase * 10);   // a fumaca abre conforme sobe
+                Ponto(batcher, px, py, tam, p % 2 == 0 ? roxo : escuro, (float)Math.Sin(Math.PI * fase) * 0.45f * sumir);
+            }
+
+            // simbolo no chao (anel roxo)
+            Anel(batcher, pe.X, pe.Y, 34, 0.35f, 40, 3, roxo, 0.6f * sumir, -seg * 2);
+        }
+
+        // ---------------- 7: CRISTAIS DE GELO (Paralyze) ----------------
+        private static void DesenhaCristais(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg)
+        {
+            float nasce = Math.Min(1f, (Time.Ticks - e.Inicio) / 300f);    // brotam rapido
+            float some = Math.Min(1f, (e.Fim - Time.Ticks) / 400f);       // derretem no fim
+            Color gelo = new Color(150, 225, 255);
+            Color branco = new Color(230, 250, 255);
+
+            for (int c = 0; c < 9; c++)
+            {
+                double ang = c / 9.0 * Math.PI * 2 + Rnd(e.Semente, c) * 0.5;
+                int r = 22 + (int)(Rnd(e.Semente, c + 10) * 14);
+                int bx = pe.X + (int)(Math.Cos(ang) * r);
+                int by = pe.Y + (int)(Math.Sin(ang) * r * 0.4);
+                int alt = (int)((14 + Rnd(e.Semente, c + 20) * 22) * nasce);
+                int topoX = bx + (int)((Rnd(e.Semente, c + 30) - 0.5f) * 8);
+
+                // cristal = triangulo pontudo (linhas da base ate a ponta)
+                for (int l = -3; l <= 3; l++)
+                {
+                    Linha(batcher, bx + l * 2, by, topoX, by - alt, 2, l == 0 ? branco : gelo, 0.55f * some);
+                }
+            }
+
+            // brilhinho piscando no gelo
+            float pisca = (float)Math.Abs(Math.Sin(seg * 5));
+            Ponto(batcher, pe.X - 10, pe.Y - 50, 5, Color.White, pisca * some);
+            Ponto(batcher, pe.X + 12, pe.Y - 30, 4, Color.White, (1 - pisca) * some);
+            Anel(batcher, pe.X, pe.Y, 40, 0.38f, 48, 3, gelo, 0.5f * some);
+        }
+
+        // ---------------- 8: CHUVA DE METEOROS (Meteor Swarm) ----------------
+        private static void DesenhaMeteoros(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg)
+        {
+            float total = (e.Fim - e.Inicio) / 1000f;
+            int qtd = 4 + e.Tamanho * 2;
+            Color laranja = new Color(255, 130, 20);
+            Color amarelo = new Color(255, 230, 90);
+            Color vermelho = new Color(255, 50, 10);
+
+            for (int m = 0; m < qtd; m++)
+            {
+                float comeca = Rnd(e.Semente, m) * total * 0.5f;    // cada meteoro sai numa hora
+                float queda = 0.45f;                                // tempo caindo (s)
+                float f = (seg - comeca) / queda;
+
+                double ang = Rnd(e.Semente, m + 40) * Math.PI * 2;
+                float dist = Rnd(e.Semente, m + 80) * 70;
+                int ix = pe.X + (int)(Math.Cos(ang) * dist);       // onde cai
+                int iy = pe.Y + (int)(Math.Sin(ang) * dist * 0.4f);
+
+                if (f < 0f)
+                {
+                    continue;
+                }
+
+                if (f < 1f)
+                {
+                    // caindo na diagonal com rastro
+                    int cx = ix - (int)((1 - f) * 160);
+                    int cy = iy - (int)((1 - f) * 320);
+
+                    for (int r = 0; r < 10; r++)
+                    {
+                        Ponto(batcher, cx - r * 6, cy - r * 12, 10 - r, r < 3 ? amarelo : laranja, (1f - r / 10f) * 0.8f);
+                    }
+
+                    Ponto(batcher, cx, cy, 12, amarelo, 1f);
+                    Ponto(batcher, cx, cy, 6, Color.White, 1f);
+                }
+                else
+                {
+                    // explosao no chao
+                    float ex = (seg - comeca - queda) / 0.6f;
+
+                    if (ex < 1f)
+                    {
+                        Anel(batcher, ix, iy, (int)(10 + ex * 45), 0.4f, 36, 4, ex < 0.4f ? amarelo : laranja, 1f - ex);
+
+                        for (int s = 0; s < 10; s++)
+                        {
+                            double a2 = s / 10.0 * Math.PI * 2;
+                            int d = (int)(ex * 35);
+                            Ponto(batcher, ix + (int)(Math.Cos(a2) * d), iy - (int)(Math.Abs(Math.Sin(a2)) * d * 1.2f), 5, vermelho, 1f - ex);
+                        }
+
+                        Ponto(batcher, ix, iy - 8, (int)(30 * (1 - ex)), amarelo, 0.7f * (1 - ex));
+                    }
+                }
+            }
+        }
+
+        // ---------------- 9: TERREMOTO (Earthquake) ----------------
+        private static void DesenhaTerremoto(UltimaBatcher2D batcher, Efeito e, Point pe, float t, float seg, float sumir)
+        {
+            Color poeira = new Color(170, 130, 80);
+            Color pedra = new Color(120, 95, 70);
+            Color brilho = new Color(255, 170, 60);
+            float escala = 0.8f + 0.3f * e.Tamanho;
+
+            // ondas de choque saindo do caster (uma a cada 0.5s)
+            for (int k = 0; k < 4; k++)
+            {
+                float f = (seg - k * 0.5f) / 1.2f;
+
+                if (f < 0f || f > 1f)
+                {
+                    continue;
+                }
+
+                Anel(batcher, pe.X, pe.Y, (int)((30 + f * 200) * escala), 0.4f, 90, 4, poeira, (1f - f) * 0.8f * sumir);
+                Anel(batcher, pe.X, pe.Y, (int)((26 + f * 196) * escala), 0.4f, 90, 2, brilho, (1f - f) * 0.4f * sumir);
+            }
+
+            // rachaduras saindo do centro
+            for (int c = 0; c < 7; c++)
+            {
+                double ang = c / 7.0 * Math.PI * 2 + Rnd(e.Semente, c);
+                float cresce = Math.Min(1f, t / 0.3f);
+                int px = pe.X, py = pe.Y;
+
+                for (int s = 1; s <= 5; s++)
+                {
+                    double a2 = ang + (Rnd(e.Semente, c * 10 + s) - 0.5f) * 0.7;
+                    int len = (int)(26 * escala * cresce);
+                    int nx = px + (int)(Math.Cos(a2) * len);
+                    int ny = py + (int)(Math.Sin(a2) * len * 0.4f);
+                    Linha(batcher, px, py, nx, ny, 3, brilho, 0.7f * sumir);
+                    px = nx;
+                    py = ny;
+                }
+            }
+
+            // pedrinhas pulando
+            for (int p = 0; p < 24; p++)
+            {
+                float fase = (Rnd(e.Semente, p + 300) + seg * 1.3f) % 1f;
+                double ang = Rnd(e.Semente, p + 400) * Math.PI * 2;
+                float dist = (30 + Rnd(e.Semente, p + 500) * 150) * escala;
+                int px = pe.X + (int)(Math.Cos(ang) * dist);
+                int py = pe.Y + (int)(Math.Sin(ang) * dist * 0.4f) - (int)(Math.Sin(Math.PI * fase) * 30);
+                Ponto(batcher, px, py, 4, p % 2 == 0 ? pedra : poeira, 0.9f * sumir);
+            }
         }
     }
 }
