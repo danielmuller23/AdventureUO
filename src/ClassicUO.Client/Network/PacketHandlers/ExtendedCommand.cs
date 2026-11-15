@@ -566,16 +566,16 @@ internal static class ExtendedCommand
             // linha 0 arrancada, 1 magia, 2 skill, 3 pocao, 4 bandagem. Tempo 0 = pronta.
             case 0xAD02:
             {
-                byte linha = p.ReadUInt8();
-                uint ms = p.ReadUInt32BE();
-                ushort id = p.ReadUInt16BE();
+                byte advLinha = p.ReadUInt8();
+                uint advMs = p.ReadUInt32BE();
+                ushort advId = p.ReadUInt16BE();
 
-                if (ms > 600000)
+                if (advMs > 600000)
                 {
-                    ms = 600000; // seguranca: no maximo 10 minutos
+                    advMs = 600000; // seguranca: no maximo 10 minutos
                 }
 
-                AdventurePainelGump.Receber(world, linha, ms, id);
+                AdventurePainelGump.Receber(world, advLinha, advMs, advId);
 
                 break;
             }
