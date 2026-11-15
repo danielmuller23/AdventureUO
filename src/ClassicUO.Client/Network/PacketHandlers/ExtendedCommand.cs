@@ -561,6 +561,25 @@ internal static class ExtendedCommand
                 break;
             }
 
+            // ADVENTURE: painel de timers (pacote proprio do shard Adventure).
+            // Sphere: SENDPACKET 0bf w12 w0AD02 <linha> d<milissegundos> w<id>
+            // linha 0 arrancada, 1 magia, 2 skill, 3 pocao, 4 bandagem. Tempo 0 = pronta.
+            case 0xAD02:
+            {
+                byte linha = p.ReadUInt8();
+                uint ms = p.ReadUInt32BE();
+                ushort id = p.ReadUInt16BE();
+
+                if (ms > 600000)
+                {
+                    ms = 600000; // seguranca: no maximo 10 minutos
+                }
+
+                AdventurePainelGump.Receber(world, linha, ms, id);
+
+                break;
+            }
+
             case 0x2A:
                 bool isfemale = p.ReadBool();
                 byte race = p.ReadUInt8();

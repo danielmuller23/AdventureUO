@@ -294,10 +294,10 @@ namespace ClassicUO.Game.GameObjects
 
         public void AddBuff(BuffIconType type, ushort graphic, uint time, string text, string title = "")
         {
-            // ADVENTURE: o buff da arrancada vai para a barra fixa propria, e nao para a barra de buffs
-            if ((ushort)type == AdventureSprintGump.BUFF_TYPE)
+            // ADVENTURE: o buff da arrancada vai para o painel fixo do Adventure, e nao para a barra de buffs
+            if ((ushort)type == AdventurePainelGump.BUFF_ARRANCADA)
             {
-                AdventureSprintGump.Ativar(World, time);
+                AdventurePainelGump.AtivarArrancada(World, time);
 
                 return;
             }
@@ -314,10 +314,10 @@ namespace ClassicUO.Game.GameObjects
 
         public void RemoveBuff(BuffIconType graphic)
         {
-            // ADVENTURE: fim da arrancada = barra fixa volta a ficar escura
-            if ((ushort)graphic == AdventureSprintGump.BUFF_TYPE)
+            // ADVENTURE: fim da arrancada = linha do painel volta a ficar escura
+            if ((ushort)graphic == AdventurePainelGump.BUFF_ARRANCADA)
             {
-                AdventureSprintGump.Desativar();
+                AdventurePainelGump.DesativarArrancada();
 
                 return;
             }

@@ -46,8 +46,8 @@ internal static class LoginComplete
                 foreach (Gump gump in gumps)
                     UIManager.Add(gump);
 
-            // ADVENTURE: barra fixa da arrancada, sempre na tela
-            AdventureSprintGump.AbrirSeFechada(world);
+            // ADVENTURE: painel de timers fixo (arrancada, magia, skill, pocao, bandagem), sempre na tela
+            AdventurePainelGump.AbrirSeFechada(world);
         }
     }
 }

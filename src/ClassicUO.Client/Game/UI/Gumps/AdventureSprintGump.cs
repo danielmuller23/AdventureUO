@@ -1,15 +1,21 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // ==========================================================================
-// ADVENTURE: barra fixa da ARRANCADA (sempre na tela).
-//  - Inativa: raio cinza, barra escura.
-//  - Ativa:   raio aceso, barra verde esvaziando com os segundos que faltam.
-//  O servidor liga com o buff 1005 (pacote 0xDF) e desliga quando remove o buff.
-//  A posicao fica salva no arquivo adventure_arrancada.txt da pasta do perfil.
+// ADVENTURE: PAINEL DE TIMERS fixo (sempre na tela). Substitui o .painel antigo (dialog).
+//  Linhas: 0 Arrancada, 1 Magia, 2 Skill, 3 Pocao, 4 Bandagem.
+//  - Pronto:     icone cinza, barra escura, texto apagado.
+//  - Esperando:  icone aceso, barra colorida esvaziando, segundos com decimo.
+//  O servidor manda o pacote proprio 0xBF sub 0xAD02:
+//     [linha byte][tempo em milissegundos dword][id word]
+//     id = numero da magia (linha 1) ou da skill (linha 2) para mostrar o nome.
+//     tempo 0 = linha pronta na hora (magia saiu, skill acabou, etc).
+//  A arrancada tambem liga pelo buff 1005 (pacote 0xDF), como antes.
+//  A posicao fica salva no arquivo adventure_painel.txt da pasta do perfil.
 // ==========================================================================
 
 using System;
 using System.IO;
 using ClassicUO.Configuration;
+using ClassicUO.Game.Data;
 using ClassicUO.Game.Managers;
 using ClassicUO.Game.UI.Controls;
 using ClassicUO.Renderer;
@@ -17,122 +23,203 @@ using Microsoft.Xna.Framework;
 
 namespace ClassicUO.Game.UI.Gumps
 {
-    public class AdventureSprintGump : Gump
+    public class AdventurePainelGump : Gump
     {
-        public const ushort BUFF_TYPE = 1005;   // numero do buff da arrancada (CR_ICONE no Sphere)
-        private const uint RAIO_ART = 0x3A5C;   // raio do trofeu (art.mul, aba Items)
-        private const int LARGURA = 150, ALTURA = 26;
-        private const ushort HUE_RAIO_ATIVO = 0x0035;    // amarelo
-        private const ushort HUE_RAIO_INATIVO = 0x0386;  // cinza
+        public const ushort BUFF_ARRANCADA = 1005; // numero do buff da arrancada (CR_ICONE no Sphere)
+
+        private const int LARGURA = 190, ALTURA_LINHA = 22, ESPACO = 3, MARGEM = 4;
+        private const ushort HUE_PRONTO = 0x0386;        // cinza (icone apagado)
         private const ushort HUE_TEXTO_ATIVO = 0x0481;   // branco
-        private const ushort HUE_TEXTO_INATIVO = 0x03B2; // cinza escuro
+        private const ushort HUE_TEXTO_PRONTO = 0x03B2;  // cinza escuro
 
-        private static AdventureSprintGump _instancia;
+        // Configuracao de cada linha: nome, arte do icone (art.mul), cor do icone aceso, cor da barra
+        private static readonly string[] NOMES = { "ARRANCADA", "MAGIA", "SKILL", "POCAO", "BANDAGEM" };
+        private static readonly uint[] ICONES = { 0x3A5C, 0x0EFA, 0x13B9, 0x0F0C, 0x0E21 };    // raio, livro, espada, pocao, bandagem
+        private static readonly ushort[] HUE_ICONE = { 0x0035, 0, 0, 0, 0 };                  // raio pintado de amarelo; os outros com a cor original
+        private static readonly Color[] CORES =
+        {
+            new Color(60, 190, 70),   // arrancada: verde
+            new Color(70, 120, 230),  // magia: azul
+            new Color(230, 130, 40),  // skill: laranja
+            new Color(60, 170, 90),   // pocao: verde
+            new Color(220, 200, 40)   // bandagem: amarelo
+        };
 
-        private readonly ResizableStaticPic _raio;
-        private readonly AlphaBlendControl _verde;
-        private readonly Label _texto;
-        private uint _inicio, _fim;  // em milissegundos (Time.Ticks)
-        private bool _ativa;
-        private int _ultimoSegundo = -1;
+        private static AdventurePainelGump _instancia;
 
-        public AdventureSprintGump(World world) : base(world, 0, 0)
+        private readonly Linha[] _linhas = new Linha[NOMES.Length];
+
+        private sealed class Linha
+        {
+            public ResizableStaticPic Icone;
+            public AlphaBlendControl Barra;
+            public Label Texto;
+            public uint Inicio, Fim;
+            public bool Ativa;
+            public string Extra = "";
+            public int UltimoDecimo = -1;
+        }
+
+        public AdventurePainelGump(World world) : base(world, 0, 0)
         {
             _instancia = this;
+            int altura = MARGEM * 2 + NOMES.Length * (ALTURA_LINHA + ESPACO) - ESPACO;
             Width = LARGURA;
-            Height = ALTURA;
+            Height = altura;
             CanMove = true;
             CanCloseWithRightClick = false;   // sempre na tela
             AcceptMouseInput = true;
             WantUpdateSize = false;
 
-            // Fundo escuro semitransparente (sem a borda antiga)
-            Add(new AlphaBlendControl(0.75f) { Width = LARGURA, Height = ALTURA, BaseColor = new Color(15, 15, 15) });
-            // Quadrado do icone
-            Add(new AlphaBlendControl(0.9f) { X = 2, Y = 2, Width = 22, Height = ALTURA - 4, BaseColor = new Color(30, 30, 30) });
-            _raio = new ResizableStaticPic(RAIO_ART, 22, ALTURA - 4) { X = 2, Y = 2, Hue = HUE_RAIO_INATIVO };
-            Add(_raio);
-            // Trilho escuro da barra
-            Add(new AlphaBlendControl(0.9f) { X = 28, Y = 5, Width = LARGURA - 32, Height = ALTURA - 10, BaseColor = new Color(35, 35, 35) });
-            // Barra verde (comeca vazia)
-            _verde = new AlphaBlendControl(0.92f) { X = 28, Y = 5, Width = 0, Height = ALTURA - 10, BaseColor = new Color(60, 190, 70) };
-            Add(_verde);
-            _texto = new Label("ARRANCADA", true, HUE_TEXTO_INATIVO, 0, 1) { X = 34, Y = 5 };
-            Add(_texto);
+            // Fundo escuro semitransparente (sem borda antiga)
+            Add(new AlphaBlendControl(0.7f) { Width = LARGURA, Height = altura, BaseColor = new Color(10, 10, 10) });
+
+            for (int i = 0; i < NOMES.Length; i++)
+            {
+                int y = MARGEM + i * (ALTURA_LINHA + ESPACO);
+                var l = new Linha();
+
+                Add(new AlphaBlendControl(0.9f) { X = MARGEM, Y = y, Width = 20, Height = ALTURA_LINHA, BaseColor = new Color(30, 30, 30) });
+                l.Icone = new ResizableStaticPic(ICONES[i], 20, ALTURA_LINHA) { X = MARGEM, Y = y, Hue = HUE_PRONTO };
+                Add(l.Icone);
+
+                int bx = MARGEM + 24;
+                Add(new AlphaBlendControl(0.9f) { X = bx, Y = y + 2, Width = LARGURA - bx - MARGEM, Height = ALTURA_LINHA - 4, BaseColor = new Color(35, 35, 35) });
+                l.Barra = new AlphaBlendControl(0.92f) { X = bx, Y = y + 2, Width = 0, Height = ALTURA_LINHA - 4, BaseColor = CORES[i] };
+                Add(l.Barra);
+
+                l.Texto = new Label(NOMES[i], true, HUE_TEXTO_PRONTO, 0, 1) { X = bx + 5, Y = y + 3 };
+                Add(l.Texto);
+
+                _linhas[i] = l;
+            }
 
             CarregarPosicao();
         }
 
-        // Chamado quando o servidor manda o buff 1005
-        public static void Ativar(World world, uint segundos)
+        // ---------- chamados de fora ----------
+
+        // Pacote 0xBF 0xAD02: liga (ms > 0) ou deixa pronta (ms = 0) uma linha
+        public static void Receber(World world, int linha, uint ms, ushort id)
         {
             AbrirSeFechada(world);
-            _instancia?.Iniciar(segundos);
+            _instancia?.Definir(linha, ms, id);
         }
 
-        // Chamado quando o servidor tira o buff 1005
-        public static void Desativar()
+        // Buff 1005 (arrancada) pelo pacote 0xDF
+        public static void AtivarArrancada(World world, uint segundos)
         {
-            _instancia?.Parar();
+            Receber(world, 0, (segundos == 0 ? 1 : segundos) * 1000, 0);
         }
 
-        // Abre a barra no login (e se por algum motivo tiver sido fechada)
+        public static void DesativarArrancada()
+        {
+            _instancia?.Definir(0, 0, 0);
+        }
+
+        // Abre o painel no login (e se por algum motivo tiver sido fechado)
         public static void AbrirSeFechada(World world)
         {
             if (_instancia == null || _instancia.IsDisposed)
             {
-                UIManager.Add(new AdventureSprintGump(world));
+                UIManager.Add(new AdventurePainelGump(world));
             }
         }
 
-        private void Iniciar(uint segundos)
+        // ---------- logica ----------
+
+        private void Definir(int linha, uint ms, ushort id)
         {
-            if (segundos == 0)
+            if (linha < 0 || linha >= _linhas.Length)
             {
-                segundos = 1;
+                return;
             }
 
-            _inicio = Time.Ticks;
-            _fim = Time.Ticks + segundos * 1000;
-            _ativa = true;
-            _ultimoSegundo = -1;
-            _raio.Hue = HUE_RAIO_ATIVO;
-            _texto.Hue = HUE_TEXTO_ATIVO;
+            Linha l = _linhas[linha];
+
+            if (ms == 0)
+            {
+                Pronta(linha);
+
+                return;
+            }
+
+            l.Extra = NomeExtra(linha, id);
+            l.Inicio = Time.Ticks;
+            l.Fim = Time.Ticks + ms;
+            l.Ativa = true;
+            l.UltimoDecimo = -1;
+            l.Icone.Hue = HUE_ICONE[linha];
+            l.Texto.Hue = HUE_TEXTO_ATIVO;
         }
 
-        private void Parar()
+        private string NomeExtra(int linha, ushort id)
         {
-            _ativa = false;
-            _verde.Width = 0;
-            _raio.Hue = HUE_RAIO_INATIVO;
-            _texto.Hue = HUE_TEXTO_INATIVO;
-            _texto.Text = "ARRANCADA";
+            try
+            {
+                if (linha == 1 && id > 0)
+                {
+                    string n = SpellsMagery.GetSpell(id).Name;
+
+                    return string.IsNullOrEmpty(n) ? "" : "  " + n;
+                }
+
+                if (linha == 2 && id < Client.Game.UO.FileManager.Skills.Skills.Count)
+                {
+                    string n = Client.Game.UO.FileManager.Skills.Skills[id].Name;
+
+                    return string.IsNullOrEmpty(n) ? "" : "  " + n;
+                }
+            }
+            catch
+            {
+                // sem nome: mostra so o tempo
+            }
+
+            return "";
+        }
+
+        private void Pronta(int linha)
+        {
+            Linha l = _linhas[linha];
+            l.Ativa = false;
+            l.Barra.Width = 0;
+            l.Icone.Hue = HUE_PRONTO;
+            l.Texto.Hue = HUE_TEXTO_PRONTO;
+            l.Texto.Text = NOMES[linha];
         }
 
         public override void Update()
         {
             base.Update();
 
-            if (!_ativa)
+            int larguraBarra = LARGURA - (MARGEM + 24) - MARGEM;
+
+            for (int i = 0; i < _linhas.Length; i++)
             {
-                return;
-            }
+                Linha l = _linhas[i];
 
-            if (Time.Ticks >= _fim)
-            {
-                Parar();   // o tempo acabou mesmo que o servidor nao tenha avisado
-                return;
-            }
+                if (!l.Ativa)
+                {
+                    continue;
+                }
 
-            float resto = (_fim - Time.Ticks) / (float)(_fim - _inicio);
-            _verde.Width = (int)((LARGURA - 32) * resto);
+                if (Time.Ticks >= l.Fim)
+                {
+                    Pronta(i);   // o tempo acabou: pronta
+                    continue;
+                }
 
-            int segundos = (int)Math.Ceiling((_fim - Time.Ticks) / 1000f);
+                float resto = (l.Fim - Time.Ticks) / (float)(l.Fim - l.Inicio);
+                l.Barra.Width = (int)(larguraBarra * resto);
 
-            if (segundos != _ultimoSegundo)
-            {
-                _ultimoSegundo = segundos;
-                _texto.Text = "ARRANCADA  " + segundos + "s";
+                int decimos = (int)Math.Ceiling((l.Fim - Time.Ticks) / 100f);
+
+                if (decimos != l.UltimoDecimo)
+                {
+                    l.UltimoDecimo = decimos;
+                    l.Texto.Text = NOMES[i] + l.Extra + "  " + (decimos / 10) + "," + (decimos % 10) + "s";
+                }
             }
         }
 
@@ -144,15 +231,15 @@ namespace ClassicUO.Game.UI.Gumps
             }
 
             // Contorno fino cinza escuro
-            batcher.DrawRectangle(SolidColorTextureCache.GetTexture(new Color(60, 60, 60)), x, y, LARGURA, ALTURA, ShaderHueTranslator.GetHueVector(0, false, 1f));
+            batcher.DrawRectangle(SolidColorTextureCache.GetTexture(new Color(60, 60, 60)), x, y, Width, Height, ShaderHueTranslator.GetHueVector(0, false, 1f));
 
             return true;
         }
 
-        // ---- posicao salva no perfil ----
+        // ---------- posicao salva no perfil ----------
         private static string ArquivoPosicao()
         {
-            return string.IsNullOrEmpty(ProfileManager.ProfilePath) ? null : Path.Combine(ProfileManager.ProfilePath, "adventure_arrancada.txt");
+            return string.IsNullOrEmpty(ProfileManager.ProfilePath) ? null : Path.Combine(ProfileManager.ProfilePath, "adventure_painel.txt");
         }
 
         private void CarregarPosicao()
