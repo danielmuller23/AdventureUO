@@ -1,9 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <ApplicationIcon>cuoicon.ico</ApplicationIcon>
-    <AssemblyName>TazUO</AssemblyName>
+    <AssemblyName>AdventureUO</AssemblyName>
     <RootNamespace>ClassicUO</RootNamespace>
     <AssemblyVersion>5.31.2</AssemblyVersion>
     <FileVersion>5.31.2</FileVersion>
