@@ -469,9 +469,10 @@ namespace ClassicUO.Game.UI.Gumps
         {
             float total = (e.Fim - e.Inicio) / 1000f;
             int qtd = 22 + e.Tamanho * 4;   // area grande: muitos meteoros
-            Color laranja = new Color(255, 130, 20);
-            Color amarelo = new Color(255, 230, 90);
-            Color vermelho = new Color(255, 50, 10);
+            Color laranja = new Color(255, 120, 20);
+            Color amarelo = new Color(255, 225, 90);
+            Color vermelho = new Color(230, 40, 10);
+            Color fumaca = new Color(90, 70, 60);
 
             for (int m = 0; m < qtd; m++)
             {
@@ -486,46 +487,89 @@ namespace ClassicUO.Game.UI.Gumps
 
                 // onde cai: espalhado em volta do ponto
                 double ang = Rnd(e.Semente, m + 40) * Math.PI * 2;
-                float dist = (0.2f + 0.8f * (float)Math.Sqrt(Rnd(e.Semente, m + 80))) * 330;   // espalhados ao redor (uns 7-8 tiles)
+                float dist = (0.2f + 0.8f * (float)Math.Sqrt(Rnd(e.Semente, m + 80))) * 330;
                 int ix = pe.X + (int)(Math.Cos(ang) * dist);
                 int iy = pe.Y + (int)(Math.Sin(ang) * dist * 0.45f);
-                int desvio = (int)((Rnd(e.Semente, m + 120) - 0.5f) * 120);   // vem levemente de lado, cada um de um jeito
+                int desvio = (int)((Rnd(e.Semente, m + 120) - 0.5f) * 140);   // cada um vem num angulo
+                float tam = 0.7f + 0.6f * Rnd(e.Semente, m + 160);           // meteoros de tamanhos diferentes
 
                 if (f < 1f)
                 {
-                    // caindo quase reto do ceu, com rastro de fogo
-                    float q = f * f;   // acelera
+                    // caindo: cabeca redonda em brasa + cauda de fogo que vira fumaca
+                    float q = f * f;
                     int cx = ix + (int)((1 - q) * desvio);
                     int cy = iy - (int)((1 - q) * 380);
+                    float dx = desvio / 380f;                                   // direcao da cauda (para tras)
 
-                    for (int r = 0; r < 12; r++)
+                    for (int r = 14; r >= 1; r--)
                     {
-                        Ponto(batcher, cx + (int)(r * desvio / 38f), cy - r * 10, 12 - r, r < 3 ? amarelo : (r < 7 ? laranja : vermelho), (1f - r / 12f) * 0.8f);
+                        float k = r / 14f;                                       // 0 perto da cabeca -> 1 fim da cauda
+                        int tx = cx + (int)(r * 9 * dx * 3);
+                        int ty = cy - r * 9;
+                        Color c = k < 0.3f ? Color.Lerp(amarelo, laranja, k / 0.3f) : (k < 0.7f ? Color.Lerp(laranja, vermelho, (k - 0.3f) / 0.4f) : Color.Lerp(vermelho, fumaca, (k - 0.7f) / 0.3f));
+                        Bola(batcher, tx, ty, (int)((16 - r * 0.6f) * tam), c, (1f - k) * 0.9f);
                     }
 
-                    Ponto(batcher, cx, cy, 14, amarelo, 1f);
-                    Ponto(batcher, cx, cy, 7, Color.White, 1f);
+                    Bola(batcher, cx, cy, (int)(26 * tam), laranja, 0.9f);       // brilho em volta
+                    Bola(batcher, cx, cy, (int)(14 * tam), amarelo, 1f);         // cabeca em brasa
+                    Bola(batcher, cx, cy, (int)(6 * tam), Color.White, 1f);      // nucleo
                 }
                 else
                 {
-                    // explosao no chao
-                    float ex = (seg - comeca - queda) / 0.6f;
+                    // explosao no chao: clarao + anel + brasas voando
+                    float ex = (seg - comeca - queda) / 0.7f;
 
                     if (ex < 1f)
                     {
-                        Anel(batcher, ix, iy, (int)(10 + ex * 50), 0.42f, 40, 5, ex < 0.4f ? amarelo : laranja, 1f - ex);
+                        float sai = 1f - (1f - ex) * (1f - ex);
+                        Bola(batcher, ix, iy - 10, (int)((30 + 40 * sai) * tam), laranja, (1f - ex) * 0.9f);
+                        Bola(batcher, ix, iy - 10, (int)((16 + 14 * sai) * tam), amarelo, 1f - ex);
+                        Anel(batcher, ix, iy, (int)((14 + sai * 55) * tam), 0.42f, 44, 4, ex < 0.4f ? amarelo : laranja, 1f - ex);
 
-                        for (int s = 0; s < 12; s++)
+                        for (int s = 0; s < 10; s++)
                         {
-                            double a2 = s / 12.0 * Math.PI * 2;
-                            int d = (int)(ex * 40);
-                            Ponto(batcher, ix + (int)(Math.Cos(a2) * d), iy - (int)(Math.Abs(Math.Sin(a2)) * d * 1.3f), 5, vermelho, 1f - ex);
+                            double a2 = s / 10.0 * Math.PI * 2 + m;
+                            int d = (int)(sai * 45 * tam);
+                            Bola(batcher, ix + (int)(Math.Cos(a2) * d), iy - (int)(Math.Abs(Math.Sin(a2)) * d * 1.2f) + (int)(ex * ex * 25), 5, vermelho, 1f - ex);
                         }
-
-                        Ponto(batcher, ix, iy - 10, (int)(36 * (1 - ex)), amarelo, 0.7f * (1 - ex));
                     }
                 }
             }
+        }
+
+        // ---------- bola de luz em degrade (branco -> cor -> transparente), para fogo e brilho redondos ----------
+        private static readonly Dictionary<uint, Texture2D> _bolas = new Dictionary<uint, Texture2D>();
+
+        private static void Bola(UltimaBatcher2D batcher, int x, int y, int raio, Color cor, float alfa)
+        {
+            if (alfa <= 0.01f || raio <= 0)
+            {
+                return;
+            }
+
+            if (!_bolas.TryGetValue(cor.PackedValue, out Texture2D tex))
+            {
+                const int N = 48;
+                var dados = new Color[N * N];
+
+                for (int yy = 0; yy < N; yy++)
+                {
+                    for (int xx = 0; xx < N; xx++)
+                    {
+                        float dx = (xx - N / 2 + 0.5f) / (N / 2f), dy = (yy - N / 2 + 0.5f) / (N / 2f);
+                        float d = Math.Min(1f, (float)Math.Sqrt(dx * dx + dy * dy));
+                        Color c = Color.Lerp(Color.White, cor, Math.Min(1f, d * 1.6f));
+                        float a = (float)Math.Pow(1f - d, 1.5);
+                        dados[yy * N + xx] = new Color((byte)(c.R * a), (byte)(c.G * a), (byte)(c.B * a), (byte)(255 * a));
+                    }
+                }
+
+                tex = new Texture2D(Client.Game.GraphicsDevice, N, N, false, SurfaceFormat.Color);
+                tex.SetData(dados);
+                _bolas[cor.PackedValue] = tex;
+            }
+
+            batcher.Draw(tex, new Rectangle(x - raio, y - raio, raio * 2, raio * 2), ShaderHueTranslator.GetHueVector(0, false, Math.Min(1f, alfa)));
         }
 
         // ---------------- 9: TERREMOTO (Earthquake): ondas pulsando ----------------

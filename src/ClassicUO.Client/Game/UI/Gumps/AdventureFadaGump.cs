@@ -9,7 +9,8 @@
 //   1 cura        - sobe em espiral em volta do dono (brilho verde)
 //   2 ataque      - voa ate o mob, da voltas nele e volta
 //   3 exploracao  - voa ate o item achado, fica brilhando e volta
-//   4 especial    - numero do especial vem no campo "arte" (1 a 5)
+//   4 especial    - numero do especial vem no campo "arte" (1 Faisca Tripla, 2 Corrente de Luz,
+//                   3 Raio Estelar, 4 Drenar, 5 Explosao de Luz)
 //   5 evolucao    - sobe girando e explode na cor nova
 //  Cada player tem a sua fada e os outros tambem veem (uma por dono).
 //
@@ -32,7 +33,7 @@ namespace ClassicUO.Game.UI.Gumps
     public class AdventureFadaGump : Gump
     {
         // ---- tempos (ms) ----
-        private const uint T_CURA = 1600, T_ATAQUE = 1400, T_EXPLORA = 3000, T_ESPECIAL = 1700, T_PETALAS = 5000, T_EVOLUCAO = 2200;
+        private const uint T_CURA = 1600, T_ATAQUE = 1400, T_EXPLORA = 3000, T_ESPECIAL = 1700, T_EVOLUCAO = 2200;
 
         // ---- cores do degrade A (uma por nivel) ----
         private static readonly Color[] COR_NIVEL =
@@ -115,7 +116,7 @@ namespace ClassicUO.Game.UI.Gumps
                     1 => T_CURA,
                     2 => T_ATAQUE,
                     3 => T_EXPLORA,
-                    4 => especial == 4 ? T_PETALAS : T_ESPECIAL,
+                    4 => T_ESPECIAL,
                     5 => T_EVOLUCAO,
                     _ => 1000
                 };
@@ -192,6 +193,23 @@ namespace ClassicUO.Game.UI.Gumps
             {
                 float f = i / (float)passos;
                 Ponto(b, x1 + (int)((x2 - x1) * f), y1 + (int)((y2 - y1) * f), tam, cor, alfa);
+            }
+        }
+
+        // raio em zigue-zague entre dois pontos (muda a cada quadro)
+        private static void Raio(UltimaBatcher2D b, Point de, Point para, int semente, float alfa)
+        {
+            const int N = 7;
+            Point ant = de;
+
+            for (int i = 1; i <= N; i++)
+            {
+                float f = i / (float)N;
+                int desvio = i == N ? 0 : (int)((Rnd(semente * 13 + i) - 0.5f) * 22);
+                Point p = new Point(de.X + (int)((para.X - de.X) * f) + desvio, de.Y + (int)((para.Y - de.Y) * f) + desvio / 2);
+                Linha(b, ant.X, ant.Y, p.X, p.Y, 3, new Color(150, 200, 255), alfa * 0.6f);
+                Linha(b, ant.X, ant.Y, p.X, p.Y, 1, Color.White, alfa);
+                ant = p;
             }
         }
 
@@ -425,21 +443,44 @@ namespace ClassicUO.Game.UI.Gumps
                     return pos;
                 }
 
-                // 2 PO DE FADA: rodeia o mob jogando po colorido; o mob dorme
+                // 2 CORRENTE DE LUZ: gira no mob e um raio pula dele para ate 2 mobs perto
                 case 2:
                 {
-                    Point pos = VaiERodeia(casa, f, t, 0.25f, 0.55f, 2f, 28);
+                    Point pos = VaiERodeia(casa, f, t, 0.25f, 0.45f, 2f, 26);
+                    float k = (f - 0.45f) / 0.4f;
 
-                    if (f > 0.2f && f < 0.9f)
+                    if (k > 0f && k < 1f && alvo != null)
                     {
-                        for (int p = 0; p < 40; p++)
+                        float a = (float)Math.Sin(Math.PI * k);
+                        Point de = centro;
+                        int achados = 0;
+
+                        foreach (Mobile mob in World.Mobiles.Values)
                         {
-                            float fase = (Rnd(p) + f * 2.5f) % 1f;
-                            int px = chao.X + (int)((Rnd(p + 50) - 0.5f) * 50);
-                            int py = chao.Y - 50 + (int)(fase * 50);
-                            Color c = Color.Lerp(new Color(255, 190, 255), new Color(120, 210, 255), Rnd(p + 90));
-                            Ponto(b, px, py, 3, c, (float)Math.Sin(Math.PI * fase));
+                            if (achados >= 2)
+                            {
+                                break;
+                            }
+
+                            if (mob.Serial == alvo.Serial || mob == dono || mob.IsDead)
+                            {
+                                continue;
+                            }
+
+                            if (Math.Max(Math.Abs(mob.X - alvo.X), Math.Abs(mob.Y - alvo.Y)) > 4)
+                            {
+                                continue;
+                            }
+
+                            Point para = Tela(mob, 0, -22);
+                            Raio(b, de, para, (int)(t * 20) + achados, a);
+                            Bola(b, para.X, para.Y, (int)(16 * a) + 4, new Color(170, 220, 255), a);
+                            de = para;
+                            achados++;
                         }
+
+                        Raio(b, pos, centro, (int)(t * 20) + 7, a);
+                        Bola(b, centro.X, centro.Y, (int)(18 * a) + 4, new Color(170, 220, 255), a);
                     }
 
                     return pos;
@@ -477,27 +518,31 @@ namespace ClassicUO.Game.UI.Gumps
                     return pos;
                 }
 
-                // 4 PETALAS PROTETORAS: petalas giram em volta do dono (5s)
+                // 4 DRENAR: gira no mob e puxa a vida dele para o dono (fluxo vermelho -> verde)
                 case 4:
                 {
-                    Color rosa = new Color(255, 170, 215);
-                    float sumir = f < 0.85f ? 1f : (1f - f) / 0.15f;
+                    Point pos = VaiERodeia(casa, f, t, 0.25f, 0.55f, 2f, 26);
+                    float k = (f - 0.3f) / 0.55f;
 
-                    for (int p = 0; p < 12; p++)
+                    if (k > 0f && k < 1f)
                     {
-                        double a = t * 2.2 + p * Math.PI / 6;
-                        int alt = 15 + (p % 3) * 22;
-                        int px = pe.X + (int)(Math.Cos(a) * 30);
-                        int py = pe.Y - alt + (int)(Math.Sin(a) * 11);
-                        Bola(b, px, py, 6, rosa, 0.9f * sumir);
-                        Ponto(b, px, py, 2, Color.White, sumir);
+                        float a = (float)Math.Sin(Math.PI * k);
+                        Point para = new Point(pe.X, pe.Y - 40);
+
+                        for (int p = 0; p < 18; p++)
+                        {
+                            float fase = (p / 18f + k * 2.2f) % 1f;      // particulas indo do mob ao dono
+                            int px = centro.X + (int)((para.X - centro.X) * fase);
+                            int py = centro.Y + (int)((para.Y - centro.Y) * fase) - (int)(Math.Sin(fase * Math.PI) * 30) + (int)(Math.Sin(t * 9 + p) * 4);
+                            Color c = Color.Lerp(new Color(255, 70, 70), new Color(110, 255, 150), fase);
+                            Bola(b, px, py, 6, c, a);
+                        }
+
+                        Bola(b, centro.X, centro.Y, 18, new Color(255, 70, 70), a * 0.7f);
+                        Bola(b, para.X, para.Y, (int)(26 * a), new Color(110, 255, 150), a * 0.6f);
                     }
 
-                    Bola(b, pe.X, pe.Y - 45, 45, rosa, 0.25f * sumir);
-
-                    double ang = t * 3;
-
-                    return new Point(pe.X + (int)(Math.Cos(ang) * 40), pe.Y - 70 + (int)(Math.Sin(ang) * 12));
+                    return pos;
                 }
 
                 // 5 EXPLOSAO DE LUZ: gira no mob e explode em ondas

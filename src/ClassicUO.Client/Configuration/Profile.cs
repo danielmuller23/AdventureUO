@@ -320,7 +320,7 @@ namespace ClassicUO.Configuration
         public bool AutoOpenDoors { get; set => SetProperty(ref field, value); } = true;
         public bool BlockDoorMovement { get; set => SetProperty(ref field, value); } = true;
         public bool SmoothDoors { get; set => SetProperty(ref field, value); } = true;
-        public bool AutoOpenCorpses { get; set => SetProperty(ref field, value); } = true;
+        public bool AutoOpenCorpses { get; set => SetProperty(ref field, value); } = false;   // ADVENTURE: desligado por padrao (antes true)
         public int AutoOpenCorpseRange { get; set => SetProperty(ref field, value); } = 2;
         public int CorpseOpenOptions { get; set => SetProperty(ref field, value); } = 3;
         public bool AutoOpenOwnCorpse { get; set => SetProperty(ref field, value); } = true;
