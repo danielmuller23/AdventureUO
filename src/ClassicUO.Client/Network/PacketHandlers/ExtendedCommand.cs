@@ -580,6 +580,20 @@ internal static class ExtendedCommand
                 break;
             }
 
+            // ADVENTURE: fada do player (pacote proprio do shard Adventure).
+            // Sphere: SENDPACKET 0bf w11 w0AD03 <nivel> <estado> w<arte> w<cor>
+            case 0xAD03:
+            {
+                byte fadaNivel = p.ReadUInt8();
+                byte fadaEstado = p.ReadUInt8();
+                ushort fadaArte = p.ReadUInt16BE();
+                ushort fadaCor = p.ReadUInt16BE();
+
+                AdventureFadaGump.Receber(world, fadaNivel, fadaEstado, fadaArte, fadaCor);
+
+                break;
+            }
+
             case 0x2A:
                 bool isfemale = p.ReadBool();
                 byte race = p.ReadUInt8();
