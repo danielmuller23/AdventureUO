@@ -20,11 +20,14 @@ namespace ClassicUO.Game.GameObjects
         public uint AdvFogoAte;       // tipo 2 Flamestrike
         public uint AdvMaldicaoAte;   // tipo 6 Curse
         public uint AdvGeloAte;       // tipo 7 Paralyze
+        public uint AdvEscudoAte;     // tipo 4 Protection
         // cores (hues do UO). Fogo de dentro pra fora: vermelho forte -> laranja -> amarelo nas pontas
         private static readonly ushort[] AdvHuesFogo = { 0x0021, 0x0026, 0x002B, 0x002E, 0x0030, 0x0030, 0x0035, 0x0035, 0x0036, 0x0036, 0x0035 };   // mais dourado nas pontas
         private static readonly ushort[] AdvHuesEscuro = { 0x0001 };
         private static readonly ushort[] AdvHuesFumaca = { 0x0013, 0x0014, 0x0015, 0x0014, 0x0015 };
-        private static readonly ushort[] AdvHuesGelo = { 0x0481, 0x0481, 0x0480 };   // branco gelo (bem visivel)
+        private static readonly ushort[] AdvHuesGeloPinta = { 0x0482 };            // pinta o corpo de gelo (branco-azulado)
+        private static readonly ushort[] AdvHuesGelo = { 0x0481, 0x0482 };       // brilho branco piscando por cima
+        private static readonly ushort[] AdvHuesEscudo = { 0x0058, 0x0059, 0x0058 };   // contorno azul do Protection
 
         private const int SIT_OFFSET_Y = 4;
         private EquipConvData? _equipConvData;
@@ -223,9 +226,14 @@ namespace ClassicUO.Game.GameObjects
                     {
                         overridenHue = profile.InvulnerableHue;
                     }
-                    else if (profile.HighlightMobilesByParalize && IsParalyzed && NotorietyFlag != NotorietyFlag.Invulnerable)
+                    else if (IsParalyzed && NotorietyFlag != NotorietyFlag.Invulnerable)
                     {
-                        overridenHue = profile.ParalyzedHue;
+                        // ADVENTURE: paralisado = corpo de GELO (no lugar da cor laranja do cliente).
+                        // Vale para qualquer paralyze (magia, field, etc.) e dura enquanto estiver paralisado.
+                        if (AdvGeloAte < Time.Ticks + 300)
+                        {
+                            AdvGeloAte = Time.Ticks + 300;
+                        }
                     }
                     else if (profile.HighlightMobilesByPoisoned && IsPoisoned)
                     {
@@ -599,7 +607,7 @@ namespace ClassicUO.Game.GameObjects
             //   Maldicao (Curse)   = corpo escurecido + fumaca roxa subindo devagar
             //   Gelo (Paralyze)    = corpo congelado azul-gelo brilhando, parado
             // So visual; dura o tempo que o servidor mandou.
-            if (AdvFogoAte != 0 || AdvMaldicaoAte != 0 || AdvGeloAte != 0)
+            if (AdvFogoAte != 0 || AdvMaldicaoAte != 0 || AdvGeloAte != 0 || AdvEscudoAte != 0)
             {
                 float advEscalaOriginal = Scale;
                 Rectangle advFrameOriginal = FrameInfo;   // nao mexe na area de clique
@@ -665,8 +673,21 @@ namespace ClassicUO.Game.GameObjects
                     else
                     {
                         float sumir = Math.Min(1f, (AdvGeloAte - Time.Ticks) / 400f);
-                        float pisca = 0.55f + 0.45f * (float)Math.Sin(advT * 9);   // pisca forte: identifica quem esta paralisado
-                        AdvCamadas(AdvHuesGelo, 0.75f * pisca, 0.2f, 0.05f, 0, 0, sumir, true, 1);
+                        float pisca = 0.5f + 0.5f * (float)Math.Sin(advT * 9);   // pisca forte: identifica quem esta paralisado
+                        AdvCamadas(AdvHuesGeloPinta, 0.80f, 0f, 0f, 0, 0, sumir, false, 1);          // pinta o corpo de gelo
+                        AdvCamadas(AdvHuesGelo, 0.65f * pisca, 0.2f, 0.05f, 0, 0, sumir, true, 1);   // brilho branco piscando
+                    }
+                }
+
+                // ---- ESCUDO (Protection): contorno azul de energia em volta do corpo ----
+                if (AdvEscudoAte != 0)
+                {
+                    if (Time.Ticks >= AdvEscudoAte) { AdvEscudoAte = 0; }
+                    else
+                    {
+                        float sumir = Math.Min(1f, (AdvEscudoAte - Time.Ticks) / 500f);
+                        float pulsa = 0.7f + 0.3f * (float)Math.Sin(advT * 6);
+                        AdvCamadas(AdvHuesEscudo, 0.45f * pulsa, 0.12f, 0.07f, 0, 0, sumir, true, 1);
                     }
                 }
 
