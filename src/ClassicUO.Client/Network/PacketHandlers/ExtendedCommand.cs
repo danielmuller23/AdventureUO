@@ -581,15 +581,16 @@ internal static class ExtendedCommand
             }
 
             // ADVENTURE: fada do player (pacote proprio do shard Adventure).
-            // Sphere: SENDPACKET 0bf w11 w0AD03 <nivel> <estado> w<arte> w<cor>
+            // Sphere: SENDPACKET 0bf w15 w0AD03 <nivel> <estado> w<arte> w<cor> d<alvo>
             case 0xAD03:
             {
                 byte fadaNivel = p.ReadUInt8();
                 byte fadaEstado = p.ReadUInt8();
                 ushort fadaArte = p.ReadUInt16BE();
                 ushort fadaCor = p.ReadUInt16BE();
+                uint fadaAlvo = p.ReadUInt32BE(); // mob do ataque (0 = nenhum)
 
-                AdventureFadaGump.Receber(world, fadaNivel, fadaEstado, fadaArte, fadaCor);
+                AdventureFadaGump.Receber(world, fadaNivel, fadaEstado, fadaArte, fadaCor, fadaAlvo);
 
                 break;
             }
