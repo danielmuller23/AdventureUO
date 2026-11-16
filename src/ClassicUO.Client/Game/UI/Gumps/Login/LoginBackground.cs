@@ -27,6 +27,11 @@ namespace ClassicUO.Game.UI.Gumps.Login
                 // UO Flag
                 Add(new GumpPic(0, 4, 0x0151, 0) { AcceptKeyboardInput = false });
             }
+            else if (AdventureImagem.Existe(AdventureImagem.FUNDO))
+            {
+                // ADVENTURE: arte "Reino ao Amanhecer" no fundo de todas as telas antes do jogo
+                Add(new AdventureImagem(AdventureImagem.FUNDO) { AcceptKeyboardInput = false });
+            }
             else
             {
                 // Background

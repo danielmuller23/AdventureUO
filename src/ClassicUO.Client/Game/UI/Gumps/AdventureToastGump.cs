@@ -10,7 +10,7 @@
 //
 // Tipos (cor / icone):
 //   1 Evento  dourado  E      4 Level             verde   +
-//   2 Boss    vermelho !      5 Leilao/Encomenda  azul    $
+//   2 Boss    vermelho !      5 Fada              azul    ✦ (estrela desenhada)
 //   3 Trofeu  roxo     T      6 Staff             branco  i
 //
 // - Entra deslizando, fica 6 s e some. No maximo 3 na tela (o 4o derruba o mais antigo).
@@ -56,7 +56,7 @@ namespace ClassicUO.Game.UI.Gumps
             new Color(235, 235, 235)   // 6 staff: branco
         };
 
-        private static readonly string[] ICONE = { "E", "!", "T", "+", "$", "i" };
+        private static readonly string[] ICONE = { "E", "!", "T", "+", "*", "i" };   // tipo 5 (fada): no lugar do "*" e desenhada a estrela ✦
 
         private sealed class Card
         {
@@ -160,7 +160,7 @@ namespace ClassicUO.Game.UI.Gumps
         {
             AdventureToastGump g = Garantir(world);
             int n = (int)(Time.Ticks / 1000 % 6) + 1;   // varia o tipo a cada clique
-            string[] titulos = { "Evento", "Boss", "Trofeu", "Level", "Leilao", "Staff" };
+            string[] titulos = { "Evento", "Boss", "Trofeu", "Level", "Fada", "Staff" };
             g.Adicionar(n, titulos[n - 1], "Este e um aviso de teste do tipo " + n + ".", false);
         }
 
@@ -338,6 +338,17 @@ namespace ClassicUO.Game.UI.Gumps
             batcher.Draw(SolidColorTextureCache.GetTexture(cor), new Rectangle(x, y, w, h), ShaderHueTranslator.GetHueVector(0, false, alpha));
         }
 
+        // estrela de 4 pontas (✦), desenhada linha a linha: larga no meio, pontas finas em cima e embaixo
+        private static void Estrela(UltimaBatcher2D batcher, int cx, int cy, int raio, Color cor, float alpha)
+        {
+            for (int dy = -raio; dy <= raio; dy++)
+            {
+                float t = 1f - Math.Abs(dy) / (float)raio;          // 1 no meio, 0 nas pontas
+                int meia = (int)Math.Round(raio * t * t * t);       // curva para dentro (formato ✦)
+                Ret(batcher, cx - meia, cy + dy, meia * 2 + 1, 1, cor, alpha);
+            }
+        }
+
         // circulo cheio com borda suave, na cor pedida
         private static void Circulo(UltimaBatcher2D batcher, int cx, int cy, int raio, Color cor, float alpha)
         {
@@ -414,8 +425,15 @@ namespace ClassicUO.Game.UI.Gumps
             // icone redondo
             int ix = x + 26, iy = y + 10 + 15;
             Circulo(batcher, ix, iy, 15, cor, alpha);
-            c.Letra.Alpha = alpha;
-            c.Letra.Draw(batcher, ix - 15, iy - c.Letra.Height / 2);
+            if (c.Tipo == 5)
+            {
+                Estrela(batcher, ix, iy, 10, new Color(20, 20, 24), alpha);   // ✦ da fada
+            }
+            else
+            {
+                c.Letra.Alpha = alpha;
+                c.Letra.Draw(batcher, ix - 15, iy - c.Letra.Height / 2);
+            }
 
             // titulo colorido e texto branco
             c.Titulo.Alpha = alpha;

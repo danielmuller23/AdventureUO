@@ -15,6 +15,21 @@ public static class AdventureToastTab
 
         return OptionsUi.Vertical(
             OptionsUi.VisualContainer(
+                new VisualContainerProps { LabelText = "Faixa de status" },
+                Option.Checkbox(
+                    "Faixa de vida/mana/stam no topo",
+                    new Accessor<bool>(
+                        () => profile.AdvBarraStatus,
+                        v =>
+                        {
+                            profile.AdvBarraStatus = v;
+                            AdventureStatusGump.AbrirSeLigada(World.Instance);   // aplica na hora
+                        }
+                    ),
+                    search: new SearchMetadata("Faixa de vida mana stamina", Keywords: ["vida", "mana", "stam", "barra", "topo"])
+                )
+            ),
+            OptionsUi.VisualContainer(
                 new VisualContainerProps { LabelText = "Posicao dos avisos" },
                 Option.ComboBox(
                     "Canto da tela",
@@ -52,7 +67,7 @@ public static class AdventureToastTab
                 Option.Checkbox("Bosses", new Accessor<bool>(() => profile.AdvToastBoss), search: new SearchMetadata("Avisos de bosses", Keywords: ["toast", "aviso"])),
                 Option.Checkbox("Trofeus", new Accessor<bool>(() => profile.AdvToastTrofeu), search: new SearchMetadata("Avisos de trofeus", Keywords: ["toast", "aviso"])),
                 Option.Checkbox("Level", new Accessor<bool>(() => profile.AdvToastLevel), search: new SearchMetadata("Avisos de level", Keywords: ["toast", "aviso"])),
-                Option.Checkbox("Leilao e encomendas", new Accessor<bool>(() => profile.AdvToastLeilao), search: new SearchMetadata("Avisos de leilao e encomendas", Keywords: ["toast", "aviso"])),
+                Option.Checkbox("Fada", new Accessor<bool>(() => profile.AdvToastLeilao), search: new SearchMetadata("Avisos da fada", Keywords: ["toast", "aviso"])),
                 Option.Checkbox("Staff", new Accessor<bool>(() => profile.AdvToastStaff), search: new SearchMetadata("Avisos da staff", Keywords: ["toast", "aviso"]))
             )
         ).WithSearch(new SearchMetadata("Avisos Adventure", Keywords: ["toast", "aviso"]));

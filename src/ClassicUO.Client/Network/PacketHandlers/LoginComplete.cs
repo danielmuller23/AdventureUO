@@ -48,6 +48,9 @@ internal static class LoginComplete
 
             // ADVENTURE: painel de timers fixo (arrancada, magia, skill, pocao, bandagem), sempre na tela
             AdventurePainelGump.AbrirSeFechada(world);
+
+            // ADVENTURE: faixa de vida/mana/stam no topo (liga/desliga nas opcoes)
+            AdventureStatusGump.AbrirSeLigada(world);
         }
     }
 }

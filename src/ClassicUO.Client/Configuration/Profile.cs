@@ -332,6 +332,8 @@ namespace ClassicUO.Configuration
         public bool AdvToastLevel { get; set => SetProperty(ref field, value); } = true;
         public bool AdvToastLeilao { get; set => SetProperty(ref field, value); } = true;
         public bool AdvToastStaff { get; set => SetProperty(ref field, value); } = true;
+        // ADVENTURE: faixa de vida/mana/stam no topo do jogo
+        public bool AdvBarraStatus { get; set => SetProperty(ref field, value); } = true;
         public int AutoOpenCorpseRange { get; set => SetProperty(ref field, value); } = 2;
         public int CorpseOpenOptions { get; set => SetProperty(ref field, value); } = 3;
         public bool AutoOpenOwnCorpse { get; set => SetProperty(ref field, value); } = true;
@@ -746,7 +748,9 @@ namespace ClassicUO.Configuration
         public bool DisplayRadius { get; set => SetProperty(ref field, value); } = false;
         public int DisplayRadiusDistance { get; set => SetProperty(ref field, value); } = 10;
         public ushort DisplayRadiusHue { get; set => SetProperty(ref field, value); } = 22;
-        public bool EnableSpellIndicators { get; set => SetProperty(ref field, value); } = true;
+        // ADVENTURE: indicadores de magia do TazUO (losango/quadrado no chao, barra de cast) sempre desligados no shard.
+        // Original: public bool EnableSpellIndicators { get; set => SetProperty(ref field, value); } = true;
+        public bool EnableSpellIndicators { get => false; set { } }
         public bool BeginSpellIndicatorOnCast { get; set => SetProperty(ref field, value); } = false;
         public bool EnableAutoLoot { get; set => SetProperty(ref field, value); } = false;
         public bool AutoLootHumanCorpses { get; set => SetProperty(ref field, value); } = false;

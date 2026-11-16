@@ -70,7 +70,9 @@ namespace ClassicUO
         }
 #endif
 
-        private static string DefaultWindowTitle => $"[TazUO - {CUOEnviroment.Version}]";
+        // ADVENTURE: titulo da janela do cliente (no jogo fica "NomeDoChar - Adventure UO")
+        // Original: private static string DefaultWindowTitle => $"[TazUO - {CUOEnviroment.Version}]";
+        private static string DefaultWindowTitle => "Adventure UO";
 
         public GameController(IPluginHost pluginHost)
         {

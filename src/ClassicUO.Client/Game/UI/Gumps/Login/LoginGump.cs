@@ -27,6 +27,9 @@ namespace ClassicUO.Game.UI.Gumps.Login
 
         private float _time;
 
+        // ADVENTURE: tela de login com a arte "Reino ao Amanhecer" (se a imagem existir em Data\Client)
+        private readonly bool _adv;
+
         public static LoginGump Instance { get; private set; }
 
         public LoginGump(World world, LoginScene scene) : base(world, 0, 0)
@@ -47,7 +50,32 @@ namespace ClassicUO.Game.UI.Gumps.Login
                 _buttonNormal = 0x15A4;
                 _buttonOver = 0x15A5;
                 const ushort HUE = 0x0386;
+                _adv = AdventureImagem.Existe(AdventureImagem.LOGIN);
 
+                if (_adv)
+                {
+                    // ADVENTURE: arte com o quadro dourado (CONTA / SENHA ja desenhados na imagem)
+                    Add(new AdventureImagem(AdventureImagem.LOGIN));
+
+                    // botao ENTRAR dourado (faz o mesmo que a seta antiga)
+                    Add(new AdventureBotaoEntrar(205, 392, 230, 28, "ENTRAR", () => OnButtonClick((int)Buttons.NextArrow)));
+
+                    // a seta antiga continua existindo (o codigo usa), mas escondida
+                    Add(_nextArrow0 = new Button((int)Buttons.NextArrow, 0x15A4, 0x15A6, 0x15A5) { X = 0, Y = 0, IsVisible = false });
+
+                    offsetX = 205;
+                    offsetY = 308;
+                    offtextY = 48;
+
+                    Add(_checkboxSaveAccount = new Checkbox(0x00D2, 0x00D3, "Lembrar conta", 1, 0x0481, false) { X = 205, Y = 428 });
+                    Add(_checkboxAutologin = new Checkbox(0x00D2, 0x00D3, "Login automatico", 1, 0x0481, false) { X = 322, Y = 428 });
+
+                    font = 1;
+                    hue = 0x0481;
+                }
+                else
+                {
+                // ---------- daqui ate o fim do "else" e o login original do TazUO ----------
                 if (Client.Game.UO.Version >= ClientVersion.CV_500A)
                 {
                     Add(new GumpPic(0, 0, 0x2329, 0));
@@ -175,6 +203,7 @@ namespace ClassicUO.Game.UI.Gumps.Login
 
                 font = 1;
                 hue = 0x0386;
+                }   // ADVENTURE: fim do login original
             }
             else
             {
@@ -271,6 +300,8 @@ namespace ClassicUO.Game.UI.Gumps.Login
             }
 
 
+            if (!_adv)   // ADVENTURE: na arte do Adventure as caixas ja estao desenhadas
+            {
             // Account Text Input Background
             Add
             (
@@ -294,6 +325,7 @@ namespace ClassicUO.Game.UI.Gumps.Login
                     Height = 30
                 }
             );
+            }
 
             offsetX += 7;
 
@@ -310,8 +342,8 @@ namespace ClassicUO.Game.UI.Gumps.Login
                 )
                 {
                     X = offsetX,
-                    Y = offsetY,
-                    Width = 190,
+                    Y = offsetY + (_adv ? 3 : 0),
+                    Width = _adv ? 216 : 190,
                     Height = 25,
                     PlaceHolderText=TazLang.Get("accountname")
                 }
@@ -331,8 +363,8 @@ namespace ClassicUO.Game.UI.Gumps.Login
                 )
                 {
                     X = offsetX,
-                    Y = offsetY + offtextY + 2,
-                    Width = 190,
+                    Y = offsetY + offtextY + (_adv ? 3 : 2),
+                    Width = _adv ? 216 : 190,
                     Height = 25
                 }
             );
@@ -378,8 +410,8 @@ namespace ClassicUO.Game.UI.Gumps.Login
                 false
             )
             {
-                X = _checkboxSaveAccount.X + _checkboxSaveAccount.Width + 10,
-                Y = 417,
+                X = _adv ? 8 : _checkboxSaveAccount.X + _checkboxSaveAccount.Width + 10,   // ADVENTURE: musica no canto de baixo
+                Y = _adv ? 458 : 417,
                 IsChecked = Settings.GlobalSettings.LoginMusic
             };
 
@@ -451,6 +483,15 @@ namespace ClassicUO.Game.UI.Gumps.Login
             Add(loadTimeLabel);
 #endif
 
+            if (_adv)
+            {
+                // ADVENTURE: versao no canto de baixo, a direita
+                var versao = new Label("Adventure UO - Beta 0.0.1", false, 0x0481, font: 9) { Y = 462 };
+                versao.X = 632 - versao.Width;
+                Add(versao);
+            }
+            else
+            {
             Add
             (
                 new Label(TazLang.Get("uoversion", [Settings.GlobalSettings.ClientVersion]), false, 0x034E, font: 9)
@@ -468,6 +509,7 @@ namespace ClassicUO.Game.UI.Gumps.Login
                     Y = 465
                 }
             );
+            }
 
             var optionsButton = new NiceButton(5, 5, 80, 30, ButtonAction.Default, TazLang.Get("options")) { IsSelectable = false, BackgroundColor = new Color(0.7f, 0.7f, 0.7f, 0.7f) };
             optionsButton.MouseDown += (s,e) =>
@@ -636,28 +678,32 @@ namespace ClassicUO.Game.UI.Gumps.Login
                 _nextArrow0.ButtonGraphicNormal = _nextArrow0.ButtonGraphicNormal == _buttonNormal ? _buttonOver : _buttonNormal;
             }
 
+            // ADVENTURE: no quadro escuro o texto fica claro (amarelo com o cursor, branco sem)
+            ushort corFoco = _adv ? (ushort)0x0035 : (ushort)0x0021;
+            ushort corNormal = _adv ? (ushort)0x0481 : (ushort)0;
+
             if (_passwordFake.HasKeyboardFocus)
             {
-                if (_passwordFake.Hue != 0x0021)
+                if (_passwordFake.Hue != corFoco)
                 {
-                    _passwordFake.Hue = 0x0021;
+                    _passwordFake.Hue = corFoco;
                 }
             }
-            else if (_passwordFake.Hue != 0)
+            else if (_passwordFake.Hue != corNormal)
             {
-                _passwordFake.Hue = 0;
+                _passwordFake.Hue = corNormal;
             }
 
             if (_textboxAccount.HasKeyboardFocus)
             {
-                if (_textboxAccount.Hue != 0x0021)
+                if (_textboxAccount.Hue != corFoco)
                 {
-                    _textboxAccount.Hue = 0x0021;
+                    _textboxAccount.Hue = corFoco;
                 }
             }
-            else if (_textboxAccount.Hue != 0)
+            else if (_textboxAccount.Hue != corNormal)
             {
-                _textboxAccount.Hue = 0;
+                _textboxAccount.Hue = corNormal;
             }
         }
 
