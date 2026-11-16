@@ -580,10 +580,30 @@ internal static class ExtendedCommand
                 break;
             }
 
-            // ADVENTURE: fada do player (pacote proprio do shard Adventure).
-            // Sphere: SENDPACKET 0bf w15 w0AD03 <nivel> <estado> w<arte> w<cor> d<alvo>
+            // ADVENTURE: 0xAD03 tem dois formatos, separados pelo tamanho do pacote:
+            //  12 bytes = NUMERO DE DANO FLUTUANTE (novo)
+            //     Sphere: SENDPACKET 0bf w12 w0AD03 d<uid> w<valor> <tipo>
+            //     tipo 0 dano no mob, 1 dano recebido, 2 cura, 3 veneno, 4 refletido, 5 critico
+            //  15 bytes = fada do proprio player (formato antigo, mantido por seguranca)
+            //     Sphere: SENDPACKET 0bf w15 w0AD03 <nivel> <estado> w<arte> w<cor> d<alvo>
             case 0xAD03:
             {
+                if (p.Remaining < 10)
+                {
+                    if (p.Remaining < 7)
+                    {
+                        break;   // pacote curto demais: ignora
+                    }
+
+                    uint danoAlvo = p.ReadUInt32BE();
+                    ushort danoValor = p.ReadUInt16BE();
+                    byte danoTipo = p.ReadUInt8();
+
+                    AdventureDanoGump.Receber(world, danoAlvo, danoValor, danoTipo);
+
+                    break;
+                }
+
                 byte fadaNivel = p.ReadUInt8();
                 byte fadaEstado = p.ReadUInt8();
                 ushort fadaArte = p.ReadUInt16BE();
