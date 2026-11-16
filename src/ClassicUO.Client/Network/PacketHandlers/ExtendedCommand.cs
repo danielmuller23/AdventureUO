@@ -631,6 +631,18 @@ internal static class ExtendedCommand
                 break;
             }
 
+            // ADVENTURE: inimigo marcado pelo auxiliar: circulo vermelho no chao + "INIMIGO: nome".
+            // Sphere: SENDPACKET 0bf w09 w0AD07 d<uid>     (d0 = apagar a marca)
+            case 0xAD07:
+            {
+                if (p.Remaining >= 4)
+                {
+                    AdventureInimigoGump.Receber(world, p.ReadUInt32BE());
+                }
+
+                break;
+            }
+
             // ADVENTURE: barra de vida de boss (pacote proprio do shard Adventure).
             // Sphere: SENDPACKET 0bf w13 w0AD06 d<uid> w<vida 0-1000> <nivel> <estado>
             // nivel 0 = "Nivel de Evento". estado 1 apanhou, 2 morreu, 3 player chegou perto

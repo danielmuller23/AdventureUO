@@ -1522,6 +1522,12 @@ namespace ClassicUO.Game.Scenes
 
             if (CanExecuteMacro())
             {
+                // ADVENTURE: F1-F8 e Shift+F1-F8 sao do auxiliar do shard (.auxb N) e tem prioridade sobre as macros
+                if (AdventureAuxiliar.TeclaApertada(key, e.repeat))
+                {
+                    return;
+                }
+
                 SelfHealManager.HandleKeyDown(key, e.mod, e.repeat);
                 ClassicUO.Game.Managers.Hotkeys.HotKeys.HandleKeyDown(key, e.mod, e.repeat);
 

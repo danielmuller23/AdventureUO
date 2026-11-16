@@ -184,6 +184,12 @@ namespace ClassicUO.Game.GameObjects
                 );
             }
 
+            // ADVENTURE: inimigo marcado pelo auxiliar (pacote 0xBF 0xAD07): circulo vermelho no chao, por baixo do corpo
+            if (Serial != 0 && Serial == ClassicUO.Game.UI.Gumps.AdventureInimigoGump.Uid)
+            {
+                ClassicUO.Game.UI.Gumps.AdventureInimigoGump.DesenhaAnel(batcher, drawX, drawY, depth + 1f);
+            }
+
             float finalAlpha = isPlayer && profile.PlayerConstantAlpha != 100 ? profile.PlayerConstantAlpha / 100f : AlphaHue / 255f;
             Vector3 hueVec = ShaderHueTranslator.GetHueVector(0, false, finalAlpha);
 
