@@ -28,6 +28,8 @@ namespace ClassicUO.Game.UI.Gumps
     {
         public static uint Uid;   // inimigo marcado (0 = nenhum)
 
+        private const int SUBIR_PX = 8;   // sobe o circulo para nao ficar abaixo do chao (aumente se ainda ficar baixo)
+
         private static AdventureInimigoGump _instancia;
         private static Texture2D _anel;
         private static readonly Lazy<BlendState> _blend = new Lazy<BlendState>(() => new BlendState
@@ -75,7 +77,7 @@ namespace ClassicUO.Game.UI.Gumps
         {
             if (_anel == null || _anel.IsDisposed)
             {
-                const int W = 96, H = 48;   // elipse achatada (perspectiva do UO)
+                const int W = 80, H = 40;   // elipse achatada (perspectiva do UO), do tamanho de 1 tile
                 var dados = new Color[W * H];
 
                 for (int yy = 0; yy < H; yy++)
@@ -107,6 +109,7 @@ namespace ClassicUO.Game.UI.Gumps
             Vector3 hue = ShaderHueTranslator.GetHueVector(0, false, pulso);
 
             batcher.SetBlendState(_blend.Value);
+            y -= SUBIR_PX;
             batcher.Draw(_anel, new Vector2(x - _anel.Width / 2, y - _anel.Height / 2), null, hue, 0f, Vector2.Zero, 1f, SpriteEffects.None, depth);
             batcher.SetBlendState(null);
         }

@@ -20,8 +20,11 @@
 //      AUXK|0|        desliga todos
 //    Sphere: SRC.SYSMESSAGE @0AD7 AUXK|3|Ctrl+F1
 //
-// 3) USAR. Ao apertar uma tecla ligada o cliente fala oculto  .auxb N
+// 3) USAR. Ao apertar uma tecla ligada o cliente manda o pacote 0xBF sub 0xAD10 (6 bytes):
+//      [0xBF][0x0006][0xAD10][botao byte]
 //    Tem prioridade sobre as macros do TazUO. Segurar a tecla nao repete.
+//
+// Botoes de 1 a 24 (AUXK, 0xAD08 e 0xAD10).
 //
 // Nomes das teclas: modificadores na ordem Ctrl+Alt+Shift+ e depois a tecla
 //   (nome do SDL sem "SDLK_": F1, A, 1, SPACE, KP_1...) ou do mouse:
@@ -46,6 +49,7 @@ namespace ClassicUO.Game
 
         private const uint INTERVALO_MS = 150;     // minimo entre dois usos da mesma tecla
         private const uint CAPTURA_MS = 20000;     // tempo maximo esperando a tecla
+        public const int MAX_BOTOES = 24;           // botoes de 1 a 24
 
         // tecla (nome normalizado, MAIUSCULO) -> botao N
         private static readonly Dictionary<string, int> _teclas = new Dictionary<string, int>();
@@ -62,9 +66,9 @@ namespace ClassicUO.Game
         // ------------------------------------------------------------------
         public static void IniciarCaptura(World world, int botao)
         {
-            if (botao <= 0)
+            if (botao < 1 || botao > MAX_BOTOES)
             {
-                return;
+                return;   // fora de 1..24: ignora
             }
 
             _capturaBotao = botao;
@@ -145,6 +149,11 @@ namespace ClassicUO.Game
             if (p.Length < 3 || !p[0].Trim().Equals("AUXK", StringComparison.OrdinalIgnoreCase) || !int.TryParse(p[1].Trim(), out int n))
             {
                 return;   // formato errado: ignora (e nao vai para o journal)
+            }
+
+            if (n < 0 || n > MAX_BOTOES)
+            {
+                return;   // so 0 (apagar todas) ou 1..24
             }
 
             string tecla = Normalizar(p[2]);
@@ -229,7 +238,21 @@ namespace ClassicUO.Game
             }
 
             _ultimoUso[n] = Time.Ticks;
-            Enviar(".auxb " + n);
+            EnviarBotao(n);
+        }
+
+        // Pacote 0xBF sub 0xAD10 (6 bytes): o servidor executa o botao N
+        private static void EnviarBotao(int n)
+        {
+            Span<byte> pacote = stackalloc byte[6];
+            pacote[0] = 0xBF;          // pacote estendido
+            pacote[1] = 0x00;          // tamanho (2 bytes) = 6
+            pacote[2] = 0x06;
+            pacote[3] = 0xAD;          // subcomando 0xAD10
+            pacote[4] = 0x10;
+            pacote[5] = (byte)n;       // botao 1..24
+
+            AsyncNetClient.Socket.Send(pacote);
         }
 
         // ------------------------------------------------------------------

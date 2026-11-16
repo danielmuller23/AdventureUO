@@ -385,7 +385,7 @@ namespace ClassicUO.Game.Scenes
                 return false;
             }
 
-            // ADVENTURE: botao do meio, Mouse4 e Mouse5 no auxiliar (escolher tecla ou usar .auxb N)
+            // ADVENTURE: botao do meio, Mouse4 e Mouse5 no auxiliar (escolher tecla ou usar o botao, pacote 0xAD10)
             if (AdventureMouseAuxiliar(button))
             {
                 return true;
@@ -1253,8 +1253,9 @@ namespace ClassicUO.Game.Scenes
                 return false;
             }
 
-            // ADVENTURE: rodinha no auxiliar do shard (escolher tecla ou usar .auxb N).
-            // Para usar, so vale com o mouse em cima do mundo (em cima de uma janela a rodinha rola a janela).
+            // ADVENTURE: rodinha no auxiliar do shard (escolher tecla ou usar o botao).
+            // Vale em QUALQUER lugar da janela do cliente (mundo, bordas, em cima da mochila, paperdoll...).
+            // Se a rodinha estiver ligada num botao, ela nao rola mais as janelas (journal, mochila).
             string advRoda = up ? "RodinhaCima" : "RodinhaBaixo";
 
             if (AdventureAuxiliar.CapturarMouse(advRoda))
@@ -1262,7 +1263,7 @@ namespace ClassicUO.Game.Scenes
                 return true;
             }
 
-            if (CanExecuteMacro() && UIManager.IsMouseOverWorld && AdventureAuxiliar.MouseApertado(advRoda))
+            if (CanExecuteMacro() && AdventureAuxiliar.MouseApertado(advRoda))
             {
                 return true;
             }
@@ -1566,7 +1567,7 @@ namespace ClassicUO.Game.Scenes
 
             if (CanExecuteMacro())
             {
-                // ADVENTURE: tecla ligada no auxiliar do shard (.auxb N): tem prioridade sobre as macros
+                // ADVENTURE: tecla ligada no auxiliar do shard (pacote 0xAD10): tem prioridade sobre as macros
                 if (AdventureAuxiliar.TeclaApertada(key, e.repeat))
                 {
                     return;
