@@ -321,6 +321,17 @@ namespace ClassicUO.Configuration
         public bool BlockDoorMovement { get; set => SetProperty(ref field, value); } = true;
         public bool SmoothDoors { get; set => SetProperty(ref field, value); } = true;
         public bool AutoOpenCorpses { get; set => SetProperty(ref field, value); } = false;   // ADVENTURE: desligado por padrao (antes true)
+        // ADVENTURE: avisos estilo toast (AdventureToastGump). Canto: 0 sup. direito, 1 sup. esquerdo,
+        // 2 inf. direito, 3 inf. esquerdo, 4 personalizado (arrastado no modo editar, posicao em X/Y)
+        public int AdvToastCanto { get; set => SetProperty(ref field, value); } = 0;
+        public int AdvToastX { get; set => SetProperty(ref field, value); } = 100;
+        public int AdvToastY { get; set => SetProperty(ref field, value); } = 100;
+        public bool AdvToastEvento { get; set => SetProperty(ref field, value); } = true;
+        public bool AdvToastBoss { get; set => SetProperty(ref field, value); } = true;
+        public bool AdvToastTrofeu { get; set => SetProperty(ref field, value); } = true;
+        public bool AdvToastLevel { get; set => SetProperty(ref field, value); } = true;
+        public bool AdvToastLeilao { get; set => SetProperty(ref field, value); } = true;
+        public bool AdvToastStaff { get; set => SetProperty(ref field, value); } = true;
         public int AutoOpenCorpseRange { get; set => SetProperty(ref field, value); } = 2;
         public int CorpseOpenOptions { get; set => SetProperty(ref field, value); } = 3;
         public bool AutoOpenOwnCorpse { get; set => SetProperty(ref field, value); } = true;

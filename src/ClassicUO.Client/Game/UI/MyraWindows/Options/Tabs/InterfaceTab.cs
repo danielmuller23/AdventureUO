@@ -51,5 +51,10 @@ public static class InterfaceTab
                 TazLang.Get("mog_cooldownstab_cooldownbarslabel"),
                 CooldownBarsTab.GetContent,
                 new SearchMetadata(TazLang.Get("mog_cooldownstab_cooldownbarslabel"), [TazLang.Get("mog_kw_cooldown"), TazLang.Get("mog_kw_timer")])
+            )
+            .AddTab(
+                "Avisos Adventure",   // ADVENTURE: posicao e tipos dos avisos (toasts)
+                AdventureToastTab.GetContent,
+                new SearchMetadata("Avisos Adventure", ["toast", "aviso"])
             );
 }

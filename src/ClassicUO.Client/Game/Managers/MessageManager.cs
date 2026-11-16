@@ -91,6 +91,19 @@ namespace ClassicUO.Game.Managers
 
             Profile currentProfile = ProfileManager.CurrentProfile;
 
+            // ADVENTURE: mensagem com a cor 0x0AD6 = aviso estilo toast ("tipo|titulo|texto").
+            // Vira um card no canto da tela e NAO vai para o journal.
+            // Se o player desligou aquele tipo nas opcoes, segue para o journal como "Titulo: texto".
+            if (hue == ClassicUO.Game.UI.Gumps.AdventureToastGump.COR_TOAST)
+            {
+                if (ClassicUO.Game.UI.Gumps.AdventureToastGump.Receber(_world, ref text))
+                {
+                    return;
+                }
+
+                hue = 0x03B2;   // tipo desligado: vai para o journal na cor normal de sistema
+            }
+
             if (textType == TextType.OBJECT)
             {
                 if (currentProfile.ForceTooltipsOnOldClients && ForcedTooltipManager.IsObjectTextRequested(_world, parent, text, hue))
