@@ -643,6 +643,19 @@ internal static class ExtendedCommand
                 break;
             }
 
+            // ADVENTURE: auxiliar - escolher a tecla de um botao. O cliente espera a proxima tecla/botao do mouse
+            // e responde ".auxtecla N,Tecla" (Esc cancela, Delete = vazio). Ver AdventureAuxiliar.cs
+            // Sphere: SENDPACKET 0bf w06 w0AD08 <botao>
+            case 0xAD08:
+            {
+                if (p.Remaining >= 1)
+                {
+                    AdventureAuxiliar.IniciarCaptura(world, p.ReadUInt8());
+                }
+
+                break;
+            }
+
             // ADVENTURE: barra de vida de boss (pacote proprio do shard Adventure).
             // Sphere: SENDPACKET 0bf w13 w0AD06 d<uid> w<vida 0-1000> <nivel> <estado>
             // nivel 0 = "Nivel de Evento". estado 1 apanhou, 2 morreu, 3 player chegou perto

@@ -956,6 +956,22 @@ namespace ClassicUO
                 case SDL_EventType.SDL_EVENT_KEY_DOWN when Scene is not null:
                     Keyboard.OnKeyDown(sdlEvent->key);
 
+                    // ADVENTURE: auxiliar esperando tecla (pacote 0xAD08): a tecla vai so para ele
+                    // (nao digita no chat, nao anda, nao roda macro)
+                    if (ClassicUO.Game.AdventureAuxiliar.Capturando)
+                    {
+                        bool advRepetindo = sdlEvent->key.repeat;
+
+                        if (!advRepetindo)
+                        {
+                            ClassicUO.Game.AdventureAuxiliar.CapturarTecla((SDL_Keycode)sdlEvent->key.key);
+                        }
+
+                        _ignoreNextTextInput = true;
+
+                        break;
+                    }
+
                     if (Plugin.ProcessHotkeys(
                             (int)sdlEvent->key.key,
                             (int)sdlEvent->key.mod,

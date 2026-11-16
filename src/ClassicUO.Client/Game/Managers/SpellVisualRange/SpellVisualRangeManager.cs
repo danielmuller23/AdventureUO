@@ -258,7 +258,9 @@ namespace ClassicUO.Game.Managers.SpellVisualRange
         /// Whether either indicator is active. Callers use this to skip the per-tile hue work when nothing
         /// is shown; <see cref="ProcessHueForTile" /> decides which indicator applies to a given tile.
         /// </summary>
-        public bool ShouldShowSpellIndicators() => IsTargetingAfterCasting() || IsCursorIndicatorActive();
+        // ADVENTURE: indicador de alcance das magias (losango roxo e quadrado vermelho no chao) DESLIGADO no shard.
+        // Original: IsTargetingAfterCasting() || IsCursorIndicatorActive()
+        public bool ShouldShowSpellIndicators() => false;
 
         public bool IsCastingWithoutTarget()
         {

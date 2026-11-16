@@ -1,21 +1,39 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // ==========================================================================
-// ADVENTURE: TECLAS DO AUXILIAR DO SHARD.
+// ADVENTURE: TECLAS LIVRES DO AUXILIAR DO SHARD.
 //
-//  F1..F8        -> o cliente fala (escondido) ".auxb 1" .. ".auxb 8"
-//  Shift+F1..F8  -> ".auxb 9" .. ".auxb 16"
+// O SERVIDOR e a fonte de verdade: ele diz qual tecla vai em qual botao.
 //
-// - O comando vai como fala para o servidor, mas nao aparece no journal nem em cima do char
-//   (o Sphere trata como comando e nao repete o texto).
-// - Estas teclas tem PRIORIDADE sobre as macros do TazUO: se a tecla e do auxiliar,
-//   a macro que estiver nela nao roda.
-// - Com Ctrl ou Alt apertado, a tecla nao e do auxiliar (segue para as macros normais).
-// - Segurar a tecla nao repete: um aperto = um comando (e no minimo 150 ms entre um e outro).
-// - O que cada numero faz e decidido no servidor (FUNCTION AUXB no Sphere).
+// 1) ESCOLHER TECLA. Servidor manda 0xBF sub 0xAD08 (6 bytes): [botao byte]
+//      Sphere: SENDPACKET 0bf w06 w0AD08 <botao>
+//    O cliente mostra "aperte a tecla..." e espera a PROXIMA tecla ou botao do mouse
+//    (rodinha cima/baixo, botao do meio, Mouse4, Mouse5), com Ctrl/Alt/Shift se tiver.
+//    Responde em fala oculta:  .auxtecla N,NomeDaTecla     (ex.: .auxtecla 3,Ctrl+F1)
+//      Esc    = cancela sem mandar nada
+//      Delete = .auxtecla N,      (vazio = apagar a tecla do botao N)
+//    Botao esquerdo e direito do mouse NAO sao capturados (sao do jogo).
+//    Sem resposta em 20 s, cancela sozinho.
+//
+// 2) LIGAR TECLA. Mensagem de sistema na COR 0x0AD7 (nao vai para o journal):
+//      AUXK|N|Tecla   liga a tecla ao botao N
+//      AUXK|N|        desliga o botao N
+//      AUXK|0|        desliga todos
+//    Sphere: SRC.SYSMESSAGE @0AD7 AUXK|3|Ctrl+F1
+//
+// 3) USAR. Ao apertar uma tecla ligada o cliente fala oculto  .auxb N
+//    Tem prioridade sobre as macros do TazUO. Segurar a tecla nao repete.
+//
+// Nomes das teclas: modificadores na ordem Ctrl+Alt+Shift+ e depois a tecla
+//   (nome do SDL sem "SDLK_": F1, A, 1, SPACE, KP_1...) ou do mouse:
+//   BotaoMeio, Mouse4, Mouse5, RodinhaCima, RodinhaBaixo.
 // ==========================================================================
 
+using System;
+using System.Collections.Generic;
 using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
+using ClassicUO.Game.Managers;
+using ClassicUO.Game.UI.Gumps;
 using ClassicUO.Input;
 using ClassicUO.Network;
 using SDL3;
@@ -24,53 +42,280 @@ namespace ClassicUO.Game
 {
     internal static class AdventureAuxiliar
     {
-        private const uint INTERVALO_MS = 150;
-        private static readonly uint[] _ultimo = new uint[17];
+        public const ushort COR_TECLA = 0x0AD7;   // cor da mensagem AUXK|N|Tecla
 
-        // Devolve true se a tecla era do auxiliar (e ja foi tratada): ai nenhuma macro roda nela
-        public static bool TeclaApertada(SDL.SDL_Keycode key, bool repetindo)
+        private const uint INTERVALO_MS = 150;     // minimo entre dois usos da mesma tecla
+        private const uint CAPTURA_MS = 20000;     // tempo maximo esperando a tecla
+
+        // tecla (nome normalizado, MAIUSCULO) -> botao N
+        private static readonly Dictionary<string, int> _teclas = new Dictionary<string, int>();
+        // botao N -> tecla (para trocar a tecla de um botao)
+        private static readonly Dictionary<int, string> _botoes = new Dictionary<int, string>();
+        private static readonly Dictionary<int, uint> _ultimoUso = new Dictionary<int, uint>();
+
+        public static bool Capturando => _capturaBotao > 0 && Time.Ticks < _capturaAte;
+        private static int _capturaBotao;
+        private static uint _capturaAte;
+
+        // ------------------------------------------------------------------
+        // 1) ESCOLHER TECLA
+        // ------------------------------------------------------------------
+        public static void IniciarCaptura(World world, int botao)
         {
-            if (Keyboard.Ctrl || Keyboard.Alt)
+            if (botao <= 0)
+            {
+                return;
+            }
+
+            _capturaBotao = botao;
+            _capturaAte = Time.Ticks + CAPTURA_MS;
+            AdventureAuxTeclaGump.Mostrar(world, botao);
+        }
+
+        public static void CancelarCaptura()
+        {
+            _capturaBotao = 0;
+            AdventureAuxTeclaGump.Fechar();
+        }
+
+        // Tecla do teclado durante a captura (chamado pelo GameController, antes de tudo)
+        public static void CapturarTecla(SDL.SDL_Keycode key)
+        {
+            if (!Capturando)
+            {
+                CancelarCaptura();
+
+                return;
+            }
+
+            switch (key)
+            {
+                case SDL.SDL_Keycode.SDLK_LCTRL:
+                case SDL.SDL_Keycode.SDLK_RCTRL:
+                case SDL.SDL_Keycode.SDLK_LALT:
+                case SDL.SDL_Keycode.SDLK_RALT:
+                case SDL.SDL_Keycode.SDLK_LSHIFT:
+                case SDL.SDL_Keycode.SDLK_RSHIFT:
+                case SDL.SDL_Keycode.SDLK_LGUI:
+                case SDL.SDL_Keycode.SDLK_RGUI:
+                    return;   // so o modificador: continua esperando a tecla de verdade
+
+                case SDL.SDL_Keycode.SDLK_ESCAPE:
+                    CancelarCaptura();   // cancela sem mandar nada
+
+                    return;
+
+                case SDL.SDL_Keycode.SDLK_DELETE:
+                    Enviar(".auxtecla " + _capturaBotao + ",");   // vazio = apagar
+                    CancelarCaptura();
+
+                    return;
+            }
+
+            Enviar(".auxtecla " + _capturaBotao + "," + Modificadores() + NomeTecla(key));
+            CancelarCaptura();
+        }
+
+        // Botao do mouse ou rodinha durante a captura (chamado pelo GameScene). Devolve true se usou.
+        public static bool CapturarMouse(string nomeMouse)
+        {
+            if (!Capturando)
             {
                 return false;
             }
 
-            int n;
+            Enviar(".auxtecla " + _capturaBotao + "," + Modificadores() + nomeMouse);
+            CancelarCaptura();
 
-            switch (key)
+            return true;
+        }
+
+        // ------------------------------------------------------------------
+        // 2) LIGAR TECLA (mensagem AUXK|N|Tecla na cor 0x0AD7)
+        // ------------------------------------------------------------------
+        public static void ReceberMensagem(string texto)
+        {
+            if (string.IsNullOrEmpty(texto))
             {
-                case SDL.SDL_Keycode.SDLK_F1: n = 1; break;
-                case SDL.SDL_Keycode.SDLK_F2: n = 2; break;
-                case SDL.SDL_Keycode.SDLK_F3: n = 3; break;
-                case SDL.SDL_Keycode.SDLK_F4: n = 4; break;
-                case SDL.SDL_Keycode.SDLK_F5: n = 5; break;
-                case SDL.SDL_Keycode.SDLK_F6: n = 6; break;
-                case SDL.SDL_Keycode.SDLK_F7: n = 7; break;
-                case SDL.SDL_Keycode.SDLK_F8: n = 8; break;
-                default: return false;
+                return;
             }
 
-            if (Keyboard.Shift)
+            string[] p = texto.Split('|', 3);
+
+            if (p.Length < 3 || !p[0].Trim().Equals("AUXK", StringComparison.OrdinalIgnoreCase) || !int.TryParse(p[1].Trim(), out int n))
             {
-                n += 8;   // Shift+F1..F8 = 9..16
+                return;   // formato errado: ignora (e nao vai para o journal)
             }
 
-            if (repetindo || Time.Ticks - _ultimo[n] < INTERVALO_MS)
+            string tecla = Normalizar(p[2]);
+
+            if (n == 0)
             {
-                return true;   // tecla segurada ou rapido demais: ignora, mas continua sendo do auxiliar
+                _teclas.Clear();   // AUXK|0| = desliga todos
+                _botoes.Clear();
+
+                return;
             }
 
-            _ultimo[n] = Time.Ticks;
+            // tira a tecla antiga deste botao
+            if (_botoes.TryGetValue(n, out string antiga))
+            {
+                _teclas.Remove(antiga);
+                _botoes.Remove(n);
+            }
 
+            if (tecla.Length == 0)
+            {
+                return;   // AUXK|N| = so desliga o botao N
+            }
+
+            // se a tecla estava em outro botao, sai de la
+            if (_teclas.TryGetValue(tecla, out int outro))
+            {
+                _botoes.Remove(outro);
+            }
+
+            _teclas[tecla] = n;
+            _botoes[n] = tecla;
+        }
+
+        // ------------------------------------------------------------------
+        // 3) USAR
+        // ------------------------------------------------------------------
+        // Teclado (GameScene.OnKeyDown, antes das macros). Devolve true se a tecla e do auxiliar.
+        public static bool TeclaApertada(SDL.SDL_Keycode key, bool repetindo)
+        {
+            if (_teclas.Count == 0)
+            {
+                return false;
+            }
+
+            if (!_teclas.TryGetValue(Modificadores().ToUpperInvariant() + NomeTecla(key), out int n))
+            {
+                return false;
+            }
+
+            if (!repetindo)
+            {
+                Usar(n);
+            }
+
+            return true;   // e do auxiliar: nenhuma macro roda nela
+        }
+
+        // Mouse (botao do meio, Mouse4, Mouse5, rodinha). Devolve true se e do auxiliar.
+        public static bool MouseApertado(string nomeMouse)
+        {
+            if (_teclas.Count == 0)
+            {
+                return false;
+            }
+
+            if (!_teclas.TryGetValue(Modificadores().ToUpperInvariant() + nomeMouse.ToUpperInvariant(), out int n))
+            {
+                return false;
+            }
+
+            Usar(n);
+
+            return true;
+        }
+
+        private static void Usar(int n)
+        {
+            if (_ultimoUso.TryGetValue(n, out uint ultimo) && Time.Ticks - ultimo < INTERVALO_MS)
+            {
+                return;   // rapido demais (rodinha girando, por exemplo)
+            }
+
+            _ultimoUso[n] = Time.Ticks;
+            Enviar(".auxb " + n);
+        }
+
+        // ------------------------------------------------------------------
+        // nomes e envio
+        // ------------------------------------------------------------------
+        public static string NomeMouse(MouseButtonType b)
+        {
+            switch (b)
+            {
+                case MouseButtonType.Middle: return "BotaoMeio";
+                case MouseButtonType.XButton1: return "Mouse4";
+                case MouseButtonType.XButton2: return "Mouse5";
+                default: return null;
+            }
+        }
+
+        private static string Modificadores()
+        {
+            string s = "";
+
+            if (Keyboard.Ctrl) s += "Ctrl+";
+            if (Keyboard.Alt) s += "Alt+";
+            if (Keyboard.Shift) s += "Shift+";
+
+            return s;
+        }
+
+        private static string NomeTecla(SDL.SDL_Keycode key)
+        {
+            string s = key.ToString();
+
+            if (s.StartsWith("SDLK_", StringComparison.OrdinalIgnoreCase))
+            {
+                s = s.Substring(5);
+            }
+
+            return s.ToUpperInvariant();
+        }
+
+        // "ctrl + f1" -> "CTRL+F1" (modificadores sempre na ordem Ctrl, Alt, Shift)
+        private static string Normalizar(string tecla)
+        {
+            if (string.IsNullOrWhiteSpace(tecla))
+            {
+                return "";
+            }
+
+            bool ctrl = false, alt = false, shift = false;
+            string principal = "";
+
+            foreach (string parte in tecla.Split('+'))
+            {
+                string t = parte.Trim().ToUpperInvariant();
+
+                if (t == "CTRL") ctrl = true;
+                else if (t == "ALT") alt = true;
+                else if (t == "SHIFT") shift = true;
+                else if (t.Length > 0) principal = t.StartsWith("SDLK_") ? t.Substring(5) : t;
+            }
+
+            if (principal.Length == 0)
+            {
+                return "";
+            }
+
+            return (ctrl ? "CTRL+" : "") + (alt ? "ALT+" : "") + (shift ? "SHIFT+" : "") + principal;
+        }
+
+        private static void Enviar(string comando)
+        {
             AsyncNetClient.Socket.Send_UnicodeSpeechRequest(
-                ".auxb " + n,
+                comando,
                 MessageType.Regular,
                 3,
                 0x03B2,
                 Settings.GlobalSettings.Language
             );
+        }
 
-            return true;
+        // Logout / troca de personagem: esquece tudo (o servidor manda de novo no login)
+        public static void Limpar()
+        {
+            _teclas.Clear();
+            _botoes.Clear();
+            _ultimoUso.Clear();
+            CancelarCaptura();
         }
     }
 }

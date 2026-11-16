@@ -94,6 +94,14 @@ namespace ClassicUO.Game.Managers
             // ADVENTURE: mensagem com a cor 0x0AD6 = aviso estilo toast ("tipo|titulo|texto").
             // Vira um card no canto da tela e NAO vai para o journal.
             // Se o player desligou aquele tipo nas opcoes, segue para o journal como "Titulo: texto".
+            // ADVENTURE: mensagem com a cor 0x0AD7 = tecla do auxiliar ("AUXK|N|Tecla"). Nunca vai para o journal.
+            if (hue == AdventureAuxiliar.COR_TECLA)
+            {
+                AdventureAuxiliar.ReceberMensagem(text);
+
+                return;
+            }
+
             if (hue == ClassicUO.Game.UI.Gumps.AdventureToastGump.COR_TOAST)
             {
                 if (ClassicUO.Game.UI.Gumps.AdventureToastGump.Receber(_world, ref text))

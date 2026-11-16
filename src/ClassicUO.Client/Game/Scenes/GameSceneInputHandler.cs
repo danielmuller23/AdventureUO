@@ -385,6 +385,12 @@ namespace ClassicUO.Game.Scenes
                 return false;
             }
 
+            // ADVENTURE: botao do meio, Mouse4 e Mouse5 no auxiliar (escolher tecla ou usar .auxb N)
+            if (AdventureMouseAuxiliar(button))
+            {
+                return true;
+            }
+
             switch (button)
             {
                 case MouseButtonType.Left:
@@ -422,8 +428,32 @@ namespace ClassicUO.Game.Scenes
             return false;
         }
 
+        // ADVENTURE: botao do mouse no auxiliar do shard. Devolve true se o auxiliar usou o botao.
+        private bool AdventureMouseAuxiliar(MouseButtonType button)
+        {
+            string nome = AdventureAuxiliar.NomeMouse(button);
+
+            if (nome == null)
+            {
+                return false;   // esquerdo e direito sao do jogo
+            }
+
+            if (AdventureAuxiliar.CapturarMouse(nome))
+            {
+                return true;   // estava esperando tecla: escolheu este botao
+            }
+
+            return CanExecuteMacro() && AdventureAuxiliar.MouseApertado(nome);
+        }
+
         internal override bool OnMouseDoubleClick(MouseButtonType button)
         {
+            // ADVENTURE: clique duplo rapido no botao do meio tambem conta para o auxiliar
+            if (ProfileManager.CurrentProfile != null && button == MouseButtonType.Middle && AdventureMouseAuxiliar(button))
+            {
+                return true;
+            }
+
             if (ProfileManager.CurrentProfile == null)
             {
                 return false;
@@ -1223,6 +1253,20 @@ namespace ClassicUO.Game.Scenes
                 return false;
             }
 
+            // ADVENTURE: rodinha no auxiliar do shard (escolher tecla ou usar .auxb N).
+            // Para usar, so vale com o mouse em cima do mundo (em cima de uma janela a rodinha rola a janela).
+            string advRoda = up ? "RodinhaCima" : "RodinhaBaixo";
+
+            if (AdventureAuxiliar.CapturarMouse(advRoda))
+            {
+                return true;
+            }
+
+            if (CanExecuteMacro() && UIManager.IsMouseOverWorld && AdventureAuxiliar.MouseApertado(advRoda))
+            {
+                return true;
+            }
+
             if (HotKeys.IsPressed(HotKeyRegistrar.ItemDragLockId) && Client.Game.UO.GameCursor.ItemHold.Enabled)
             {
                 if (!up && !Client.Game.UO.GameCursor.ItemHold.IsFixedPosition)
@@ -1522,7 +1566,7 @@ namespace ClassicUO.Game.Scenes
 
             if (CanExecuteMacro())
             {
-                // ADVENTURE: F1-F8 e Shift+F1-F8 sao do auxiliar do shard (.auxb N) e tem prioridade sobre as macros
+                // ADVENTURE: tecla ligada no auxiliar do shard (.auxb N): tem prioridade sobre as macros
                 if (AdventureAuxiliar.TeclaApertada(key, e.repeat))
                 {
                     return;
