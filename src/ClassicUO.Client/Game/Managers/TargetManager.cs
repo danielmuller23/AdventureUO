@@ -171,6 +171,10 @@ namespace ClassicUO.Game.Managers
             {
                 _lastAttack = value;
 
+                // ADVENTURE: o player atacou (0x05) ou o servidor marcou o alvo de guerra (0xAA):
+                // reabre a barra de boss se ele tinha fechado no X
+                AdventureBossGump.PlayerAtacou(_world, value);
+
                 // Only a real mobile gets a bar: World.Clear() zeroes this on logout and character
                 // switch, which would otherwise open one for serial 0.
                 if (SerialHelper.IsMobile(value) && ProfileManager.CurrentProfile?.OpenHealthBarForLastAttack == true)

@@ -13,7 +13,10 @@
 //
 // - Varios bosses ao mesmo tempo: as barras empilham uma embaixo da outra.
 // - A janela e movel; a posicao fica salva em adventure_boss.txt (pasta do perfil).
-// - Botao X: fecha a barra e ignora aquele boss ate ele morrer.
+// - Botao X: esconde a barra daquele boss. Pacotes de estado 1 (outros players
+//   batendo) NAO reabrem. Ela so reabre se o PROPRIO player atacar aquele boss
+//   (pedido de ataque 0x05 ou o boss virar o alvo de guerra, pacote 0xAA).
+//   Quando o boss morre (estado 2) ele sai da lista de fechados.
 // - Fecha sozinha apos 15 s sem pacote ou se o boss sair da tela.
 // - Faixa amarela: o dano recente aparece em amarelo e vai sumindo atras da vida.
 // ==========================================================================
@@ -70,7 +73,8 @@ namespace ClassicUO.Game.UI.Gumps
         }
 
         private static AdventureBossGump _instancia;
-        private static readonly HashSet<uint> _ignorados = new HashSet<uint>();   // fechados no X ate morrer
+        // fechados no X: guarda a ultima vida/nivel para reabrir na hora se o player atacar
+        private static readonly Dictionary<uint, (int Vida, int Nivel)> _fechados = new Dictionary<uint, (int Vida, int Nivel)>();
         private readonly List<Barra> _barras = new List<Barra>();
         private uint _ultimoUpdate;
 
@@ -95,7 +99,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             if (estado == 2)
             {
-                _ignorados.Remove(uid);   // morreu: o X deixa de valer
+                _fechados.Remove(uid);   // morreu: sai da lista de fechados
                 _instancia?.Morte(uid);
 
                 return;
@@ -106,9 +110,10 @@ namespace ClassicUO.Game.UI.Gumps
                 return;
             }
 
-            if (_ignorados.Contains(uid))
+            if (_fechados.ContainsKey(uid))
             {
-                return;   // player fechou no X
+                _fechados[uid] = (vida, nivel);   // continua fechada, mas guarda a vida atual
+                return;
             }
 
             Mobile m = world.Mobiles.Get(uid);
@@ -124,6 +129,31 @@ namespace ClassicUO.Game.UI.Gumps
             }
 
             _instancia.Atualizar(m, vida, nivel);
+        }
+
+        // Chamado quando o PROPRIO player ataca (TargetManager.LastAttack): reabre a barra fechada no X
+        public static void PlayerAtacou(World world, uint uid)
+        {
+            if (uid == 0 || !_fechados.TryGetValue(uid, out var guardado))
+            {
+                return;
+            }
+
+            _fechados.Remove(uid);
+
+            Mobile m = world.Mobiles.Get(uid);
+
+            if (m == null || m.IsDestroyed)
+            {
+                return;
+            }
+
+            if (_instancia == null || _instancia.IsDisposed)
+            {
+                UIManager.Add(new AdventureBossGump(world));
+            }
+
+            _instancia.Atualizar(m, guardado.Vida, guardado.Nivel);
         }
 
         private void Atualizar(Mobile m, int vida, int nivel)
@@ -363,7 +393,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                     if (!b.Morreu)
                     {
-                        _ignorados.Add(b.Uid);   // ignora ate ele morrer
+                        _fechados[b.Uid] = (b.Vida, b.Nivel);   // esconde ate o player atacar ou ele morrer
                     }
 
                     Remover(b);
