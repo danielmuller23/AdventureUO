@@ -631,6 +631,26 @@ internal static class ExtendedCommand
                 break;
             }
 
+            // ADVENTURE: barra de vida de boss (pacote proprio do shard Adventure).
+            // Sphere: SENDPACKET 0bf w13 w0AD06 d<uid> w<vida 0-1000> <nivel> <estado>
+            // nivel 0 = "Nivel de Evento". estado 1 apanhou, 2 morreu, 3 player chegou perto
+            case 0xAD06:
+            {
+                if (p.Remaining < 8)
+                {
+                    break;   // pacote curto demais: ignora
+                }
+
+                uint bossUid = p.ReadUInt32BE();
+                ushort bossVida = p.ReadUInt16BE();
+                byte bossNivel = p.ReadUInt8();
+                byte bossEstado = p.ReadUInt8();
+
+                AdventureBossGump.Receber(world, bossUid, bossVida, bossNivel, bossEstado);
+
+                break;
+            }
+
             // ADVENTURE: efeitos de magia modernos (furacao de cura, corpo em chamas).
             // Sphere: SENDPACKET 0bf w18 w0AD04 <tipo> d<alvo> <r> <g> <b> <tamanho> w<valor> w<ms>
             case 0xAD04:
