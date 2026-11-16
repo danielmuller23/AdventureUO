@@ -477,7 +477,7 @@ namespace ClassicUO.Game.UI.Gumps.Login
                 login_music.IsVisible = false;
 
                 var musica = new AdventureMarcador(10, 458, "Musica", Settings.GlobalSettings.LoginMusic);
-                var volume = new AdventureSlider(musica.X + musica.Width + 10, 459, 90, Settings.GlobalSettings.LoginMusicVolume) { IsVisible = Settings.GlobalSettings.LoginMusic };
+                var volume = new AdventureSlider(musica.X + musica.Width + 6, 459, 80, Settings.GlobalSettings.LoginMusicVolume) { IsVisible = Settings.GlobalSettings.LoginMusic };
 
                 musica.Mudou += ligado =>
                 {
@@ -566,12 +566,10 @@ namespace ClassicUO.Game.UI.Gumps.Login
                 optionsButton.ContextMenu = c;
                 c.Show();
             };
-            if (_adv)
+            if (!_adv)   // ADVENTURE: sem o botao "Options" do TazUO na tela de login
             {
-                optionsButton.Y = AdventureBarraTitulo.ALT + 4;   // ADVENTURE: abaixo da barra de titulo propria
+                Add(optionsButton);
             }
-
-            Add(optionsButton);
         }
 
         private ContextMenuControl GenOptionsContext()
