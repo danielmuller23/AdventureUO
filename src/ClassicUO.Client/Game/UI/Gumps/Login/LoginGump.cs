@@ -54,21 +54,27 @@ namespace ClassicUO.Game.UI.Gumps.Login
 
                 if (_adv)
                 {
-                    // ADVENTURE: arte com o quadro dourado (CONTA / SENHA ja desenhados na imagem)
+                    // ADVENTURE: arte com o quadro dourado (titulo, CONTA e SENHA ja desenhados na imagem)
                     Add(new AdventureImagem(AdventureImagem.LOGIN));
 
                     // botao ENTRAR dourado (faz o mesmo que a seta antiga)
-                    Add(new AdventureBotaoEntrar(205, 392, 230, 28, "ENTRAR", () => OnButtonClick((int)Buttons.NextArrow)));
+                    Add(new AdventureBotaoEntrar(205, 298, 230, 28, "ENTRAR", () => OnButtonClick((int)Buttons.NextArrow)));
 
                     // a seta antiga continua existindo (o codigo usa), mas escondida
                     Add(_nextArrow0 = new Button((int)Buttons.NextArrow, 0x15A4, 0x15A6, 0x15A5) { X = 0, Y = 0, IsVisible = false });
 
                     offsetX = 205;
-                    offsetY = 308;
+                    offsetY = 214;
                     offtextY = 48;
 
-                    Add(_checkboxSaveAccount = new Checkbox(0x00D2, 0x00D3, "Lembrar conta", 1, 0x0481, false) { X = 205, Y = 428 });
-                    Add(_checkboxAutologin = new Checkbox(0x00D2, 0x00D3, "Login automatico", 1, 0x0481, false) { X = 322, Y = 428 });
+                    // as caixas antigas ficam escondidas (o resto do codigo usa); quem aparece e o marcador moderno.
+                    // "Login automatico" foi retirado: fica sempre desligado.
+                    Add(_checkboxSaveAccount = new Checkbox(0x00D2, 0x00D3, "", 1, 0x0481, false) { IsVisible = false });
+                    Add(_checkboxAutologin = new Checkbox(0x00D2, 0x00D3, "", 1, 0x0481, false) { IsVisible = false });
+
+                    var lembrar = new AdventureMarcador(207, 335, "Lembrar conta", Settings.GlobalSettings.SaveAccount);
+                    lembrar.Mudou += v => _checkboxSaveAccount.IsChecked = v;
+                    Add(lembrar);
 
                     font = 1;
                     hue = 0x0481;
@@ -334,15 +340,15 @@ namespace ClassicUO.Game.UI.Gumps.Login
             (
                 _textboxAccount = new StbTextBox
                 (
-                    5,
+                    (byte)(_adv ? 1 : 5),   // ADVENTURE: fonte lisa no quadro novo
                     16,
-                    190,
-                    false,
+                    _adv ? 216 : 190,
+                    _adv,
                     hue: 0x034F
                 )
                 {
                     X = offsetX,
-                    Y = offsetY + (_adv ? 3 : 0),
+                    Y = offsetY + (_adv ? 5 : 0),
                     Width = _adv ? 216 : 190,
                     Height = 25,
                     PlaceHolderText=TazLang.Get("accountname")
@@ -355,15 +361,15 @@ namespace ClassicUO.Game.UI.Gumps.Login
             (
                 _passwordFake = new PasswordStbTextBox
                 (
-                    5,
+                    (byte)(_adv ? 1 : 5),   // ADVENTURE: fonte lisa no quadro novo
                     16,
-                    190,
-                    false,
+                    _adv ? 216 : 190,
+                    _adv,
                     hue: 0x034F
                 )
                 {
                     X = offsetX,
-                    Y = offsetY + offtextY + (_adv ? 3 : 2),
+                    Y = offsetY + offtextY + (_adv ? 5 : 2),
                     Width = _adv ? 216 : 190,
                     Height = 25
                 }
@@ -399,6 +405,12 @@ namespace ClassicUO.Game.UI.Gumps.Login
 
             _checkboxSaveAccount.IsChecked = Settings.GlobalSettings.SaveAccount;
             _checkboxAutologin.IsChecked = Settings.GlobalSettings.AutoLogin;
+
+            if (_adv)
+            {
+                _checkboxAutologin.IsChecked = false;   // ADVENTURE: sem login automatico
+                Settings.GlobalSettings.AutoLogin = false;
+            }
 
             var loginmusic_checkbox = new Checkbox
             (
@@ -458,6 +470,42 @@ namespace ClassicUO.Game.UI.Gumps.Login
                 Client.Game.Audio.UpdateCurrentMusicVolume();
             };
 
+            if (_adv)
+            {
+                // ADVENTURE: musica e volume modernos no canto de baixo (os antigos ficam escondidos)
+                loginmusic_checkbox.IsVisible = false;
+                login_music.IsVisible = false;
+
+                var musica = new AdventureMarcador(10, 458, "Musica", Settings.GlobalSettings.LoginMusic);
+                var volume = new AdventureSlider(musica.X + musica.Width + 10, 459, 90, Settings.GlobalSettings.LoginMusicVolume) { IsVisible = Settings.GlobalSettings.LoginMusic };
+
+                musica.Mudou += ligado =>
+                {
+                    Settings.GlobalSettings.LoginMusic = ligado;
+                    Client.Game.Audio.UpdateCurrentMusicVolume();
+
+                    if (ligado)
+                    {
+                        Client.Game.Audio.PlayMusic(Client.Game.Audio.LoginMusicIndex, false, true);
+                    }
+                    else
+                    {
+                        Client.Game.Audio.StopMusic();
+                    }
+
+                    volume.IsVisible = ligado;
+                };
+
+                volume.Mudou += v =>
+                {
+                    Settings.GlobalSettings.LoginMusicVolume = v;
+                    Client.Game.Audio.UpdateCurrentMusicVolume();
+                };
+
+                Add(musica);
+                Add(volume);
+            }
+
 
             if (!string.IsNullOrEmpty(_textboxAccount.Text))
             {
@@ -486,7 +534,7 @@ namespace ClassicUO.Game.UI.Gumps.Login
             if (_adv)
             {
                 // ADVENTURE: versao no canto de baixo, a direita
-                var versao = new Label("Adventure UO - Beta 0.0.1", false, 0x0481, font: 9) { Y = 462 };
+                var versao = new AdventureRotulo(0, 459, "Adventure UO - Beta 0.0.1", 12, new Color(235, 220, 190));
                 versao.X = 632 - versao.Width;
                 Add(versao);
             }
@@ -518,6 +566,11 @@ namespace ClassicUO.Game.UI.Gumps.Login
                 optionsButton.ContextMenu = c;
                 c.Show();
             };
+            if (_adv)
+            {
+                optionsButton.Y = AdventureBarraTitulo.ALT + 4;   // ADVENTURE: abaixo da barra de titulo propria
+            }
+
             Add(optionsButton);
         }
 

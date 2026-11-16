@@ -88,6 +88,13 @@ namespace ClassicUO.Game.Scenes
 
             UIManager.Add(new LoginBackground(_world));
 
+            // ADVENTURE: janela sem a borda do Windows e com a barra de titulo propria (igual ao launcher)
+            if (AdventureImagem.Existe(AdventureImagem.FUNDO))
+            {
+                Client.Game.SetWindowBordered(false);
+                UIManager.Add(new AdventureBarraTitulo(_world));
+            }
+
             if (string.IsNullOrEmpty(Settings.GlobalSettings.IP))
             {
                 new PromptPopupWindow("Server IP", "Please enter a server IP to connect to", input =>
@@ -155,6 +162,10 @@ namespace ClassicUO.Game.Scenes
             Client.Game.Audio?.StopSounds();
 
             UIManager.GetGump<LoginBackground>()?.Dispose();
+
+            // ADVENTURE: volta a borda normal do Windows ao entrar no jogo
+            UIManager.GetGump<AdventureBarraTitulo>()?.Dispose();
+            Client.Game.SetWindowBordered(true);
 
             _currentGump?.Dispose();
 
